@@ -1,5 +1,4 @@
 .vscode
 **/__pycache__
-*.json
 HWK-System.code-workspace
 menu_items.json
