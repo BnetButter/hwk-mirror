@@ -2,6 +2,9 @@ from operator import itemgetter
 from .metaclass import MenuItem
 from .metaclass import MenuType
 from .metaclass import OrderInterface
+import logging
+
+logger = logging.getLogger("gui")
 
 class Ticket(MenuItem):
 
@@ -11,6 +14,9 @@ class Ticket(MenuItem):
         else:
             assert all(option in menu_item[3] for option in selected_options)
             return tuple.__new__(cls, (*menu_item, list(selected_options)))
+
+    def __bool__(self):
+        return self.total > 0
 
     @property
     def total(self):
@@ -42,6 +48,8 @@ def new(cls, menu_item, addon1, addon2, selected_options=None):
             addon1,
             addon2)))
 
+    logger.debug(f"Added ticket {menu_item.name, addon1.name, addon2.name}")
+
 @property
 def total(self):
     total = self.price
@@ -52,11 +60,12 @@ def total(self):
         total += self.addon1.total
         total += self.addon2.total
     return total
-    
+
 addon1 = property(itemgetter(5))
 addon2 = property(itemgetter(6))
 
 def NewOrder():
+    logger.info("Created new Order...")
     return OrderInterface("Orders", (Ticket,), {
         "__new__": new,
         "total": total,

@@ -1,16 +1,18 @@
+"""in-memory streams that interfaces with gui widgets"""
+
 from io import StringIO
 import tkinter as tk
 
 class stringio(StringIO):
-    
+    """Seemless integration for logging and gui widgets"""
+
     methods = ["read", "write", "__iter__", "close"]
 
-    def __init__(self, initial_value="", newline="\n"):
-        super().__init__(initial_value, newline)
-    
-    
     @staticmethod
     def set(instance, other):
+        """[instance]: an initiated stringio object.
+        [other]: an instance of some class which defines alternative stringio.methods"""
+
         for name in stringio.methods:
             if hasattr(other, name):
                 instance.__setattr__(name, other.__getattribute__(name))
@@ -20,6 +22,7 @@ class stringio(StringIO):
     def read(self, *args):
         return self.getvalue()
 
+# default implementations.
 def __iter__(self):
     for line in StringIO.getvalue(type(self).stream).split('\n'):
         yield line
@@ -56,15 +59,9 @@ default_methods = {
 stdin = stringio()
 stdout = stringio()
 stderr = stringio()
-
 new_stream = stringio.set
 
-
 class StreamType(type):
-
-    stdout = stringio()
-    stderr = stringio()
-    stdin = stringio()
 
     def __new__(cls, name, bases, attr, stream=None, **kwargs):
         for method in stringio.methods:

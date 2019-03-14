@@ -2,3 +2,5 @@
 **/__pycache__
 HWK-System.code-workspace
 menu_items.json
+makefile
+main.py

@@ -22,6 +22,10 @@ LINE_NO = "%(lineno)s"
 MESSAGE = "%(message)s"
 NAME = "%(name)s"
 
+LOGNAME_GUI_STDOUT = "gui.stdout"
+LOGNAME_GUI_STDERR = "gui.stderr"
+
+
 def black(string, effect=1):
     return ESC + BLACK.format(effect) + string + END
 

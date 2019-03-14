@@ -10,7 +10,9 @@ class AsyncWindow(tk.Tk):
         self.interval = 1 / refresh_rate
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.bind("<Escape>", self.close)
-
+        self.add_task(self._update)
+        
+    
     def add_task(self, coro, *args):
         self.tasks.append(
             self.loop.create_task(coro(*args)))
@@ -27,5 +29,4 @@ class AsyncWindow(tk.Tk):
         self.destroy()
     
     def mainloop(self):
-        self.add_task(self._update)
         self.loop.run_forever()

@@ -1,31 +1,48 @@
-from lib import stdout
-from lib import StreamType, new_stream
-from lib.data import colors
-import logging as log
-import tkinter as tk
-from POS import console_stdout
-from POS import console_stderr
-from POS import console_stdin
-from lib import TabbedFrame
-from POS import Console
-from POS import MenuDisplay
-stdout.write("writing to stdout...\n")
-logger = log.getLogger(__name__)
-logger.setLevel(log.INFO)
-stream_handler = log.StreamHandler(stream=stdout)
-logger.addHandler(stream_handler)
+import logging
+import sys
 
-root = tk.Tk()
-menu_display = MenuDisplay(root)
-console = Console(root)
-console.echo = stdout
-stdout.write("hello\n")
-console.grid(row=0, column=0)
+main_logger = logging.getLogger()
+main_logger.setLevel(logging.DEBUG)
+main_stdout = logging.StreamHandler(stream=sys.stdout)
+main_logger.addHandler(main_stdout)
 
 
-logger.info("logger: INFO")
-stdout.write("writing to widget\n")
-root.mainloop()
+
+if __name__ == "__main__":
+    from lib import AsyncWindow
+    from POS import MenuDisplay
+    from POS import OrderDisplay
+    from POS import Console
+    from POS import PriceDisplay
+    import lib
+    
+    from tkinter import ttk
+    import tkinter as tk
+
+    main = AsyncWindow()
+    main.geometry("1280x800")
+    main.grid_columnconfigure(1, weight=2)
+    main.grid_rowconfigure(0, weight=1)
+    main.resizable(False, False)
+
+    menu_display = MenuDisplay(main, relief=tk.RIDGE, bd=2)
+    menu_display.grid(row=0, column=0, sticky="nswe", padx=2, pady=2)
+    
+    order_display = OrderDisplay(main, bd=2, relief=tk.RIDGE)
+    order_display.grid(row=0, column=1, pady=2, padx=2, sticky="nswe")
+
+    console = Console(main, bd=2)
+    console.grid(row=2, column=0, pady=5, sticky="nswe")
+
+    price_display = PriceDisplay(main, relief=tk.RIDGE, bd=2)
+    price_display.grid(row=2, column=1)
+
+    main.mainloop()
+
+
+
+
+
 
 
 

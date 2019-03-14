@@ -156,7 +156,7 @@ class OptionButton(LabelButton):
 
         
 class ItemSelector(tk.Frame, metaclass=MenuWidget, device="POS"):
-    font = ("Courier", 12)
+    font = ("Courier", 16)
     
     def __init__(self, parent, menu_item, **kwargs):
         super().__init__(parent, **kwargs)
@@ -217,6 +217,7 @@ class ItemSelector(tk.Frame, metaclass=MenuWidget, device="POS"):
 
         if addon1.options or addon2.options:
             AddonOptions(self, Order()[-1])
+        self.reset()
 
     def reset(self):
         self.dropdown1.reset()
@@ -231,8 +232,4 @@ class CategoryFrame(tkwidgets.ScrollFrame, metaclass=MenuType):
         self.item_frames = [
                 ItemSelector(self.interior, item) for item in CategoryFrame.category(category)]
         for i, item in enumerate(self.item_frames):
-            self.interior.grid_columnconfigure(0, weight=1)
             item.grid(row=i, column=0, columnspan=4, sticky="nswe")
-        
-        self.configure_canvas(0)
-        self.configure_interior(0)

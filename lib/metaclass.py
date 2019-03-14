@@ -6,6 +6,10 @@ from decimal import ROUND_HALF_DOWN
 from operator import itemgetter
 from .data import MENUDATA
 from .data import CONFIGDATA
+from .stream import stdout, stderr
+import logging
+
+logger = logging.getLogger("gui")
 
 class MenuItem(tuple):
     def __new__(self, category, name, price, options):
@@ -23,30 +27,55 @@ class MenuItem(tuple):
     price = property(itemgetter(2))
     options = property(itemgetter(3))
 
+
 class MenuType(type):
     """Provides a class with an interface to menu information"""
+    
+    menu_items = MENUDATA["menu"]
+    menu_config = MENUDATA["config"]
 
-    def __new__(self, name, bases, attr, *args, **kwargs):
-        attr["menu"] = MENUDATA["menu"]
-        attr["config"] = MENUDATA["config"]
-        return super().__new__(self, name, bases, attr)
+    def __new__(cls, name, bases, attr, *args, **kwargs):
+        attr["menu"] = cls.menu_items
+        attr["config"] = cls.menu_config
+        return super().__new__(cls, name, bases, attr)
 
     def __init__(self, name, bases, attr, *args, **kwargs):
-        items = [self.menu[category].keys() for category in self.menu]
-        items = [item for lst in items for item in lst]
-        sides = list(self.menu["Sides"].keys())
-        sides.extend(list(self.menu["Drinks"].keys()))
-        self.categories = sorted([category for category in self.menu], key=len, reverse=True)
-        self.longest_item = len(sorted(items, key=len)[-1])
-        self.longest_addon = len(sorted(sides, key=len)[-1])
-        self.longest_category = len(sorted(self.categories, key=len)[-1])
         self.include_sides = self.config["Sides Included"]
         self.include_drinks = self.config["Drinks Included"]
         self.two_sides = self.config["Two Sides"]
         self.no_addons = self.config["No Addons"]
-        self.taxrate = Decimal(self.config["Tax"]).quantize(Decimal('.01'))
 
+    @property
+    def all_item_names(self):
+        items = [self.menu[category].keys() for category in self.menu]
+        return [item for lst in items for item in lst]
 
+    @property
+    def all_addon_names(self):
+        sides = list(self.menu["Sides"].keys())
+        sides.extend(list(self.menu["Drinks"].keys()))
+        return sides
+
+    @property
+    def categories(self):
+        return sorted([category for category in self.menu], key=len, reverse=True)
+    
+    @property
+    def longest_item(self):
+        return len(sorted(self.all_item_names, key=len)[-1])
+    
+    @property
+    def longest_addon(self):
+        return len(sorted(self.all_addon_names, key=len)[-1])
+
+    @property
+    def longest_category(self):
+        return len(sorted(self.categories, key=len)[-1])
+
+    @property
+    def taxrate(self):
+        return Decimal(self.config["Tax"]).quantize(Decimal('.01'))
+    
     def category(self, category, cls=MenuItem):
         """return a list of menu items"""
         return [
@@ -84,6 +113,10 @@ class WidgetType(type):
                 config[device][name][font] = attr[font]
         return super().__new__(cls, name, bases, attr)
 
+
+# OrderInterface creates a singleton class accessed by calling lib.Order()
+# calling lib.NewOrder() replaces the instance with a new list
+
 class OrderInterface(MenuType, UserList):
     instance = None
 
@@ -94,6 +127,10 @@ class OrderInterface(MenuType, UserList):
 
     def __str__(self):
         return str(self.data)
+
+    def remove(self, item):
+        super().remove(item)
+        logger.info(f"Removed ticket: {item.name, item.addon1.name, item.addon2.name}")
 
     @property
     def data(self):
