@@ -6,7 +6,7 @@ import tkinter as tk
 class stringio(StringIO):
     """Seemless integration for logging and gui widgets"""
 
-    methods = ["read", "write", "__iter__", "close"]
+    methods = ["read", "write", "close"]
 
     @staticmethod
     def set(instance, other):
@@ -21,18 +21,44 @@ class stringio(StringIO):
 
     def read(self, *args):
         return self.getvalue()
+    
+    def __iter__(self):
+        self.count = 0
+        self.iterable = self.getvalue().split('\n')
+        self.max = len(self.iterable)
+        return self
+
+    def __next__(self):
+        if self.count > self.max - 1:
+            raise StopIteration
+        self.count += 1
+        return self.iterable[self.count - 1]
+    
+    def __aiter__(self):
+        self.count = 0
+        self.iterable = self.getvalue().split('\n')
+        self.max = len(self.iterable)
+        return self
+    
+    async def __anext__(self):
+        if self.count > self.max - 1:
+            raise StopAsyncIteration
+        self.count += 1
+        return self.iterable[self.count - 1]
+
+
 
 # default implementations.
-def __iter__(self):
-    for line in StringIO.getvalue(type(self).stream).split('\n'):
-        yield line
+
 
 def read(self):
     return StringIO.getvalue(type(self).stream)
 
-def write(self, content):
+def write(self, content, replace=0):
     self['state'] = tk.NORMAL
-    self.insert(tk.END, content)
+    if replace:
+        self.delete(tk.END + f"-{replace}c", tk.END)
+    self.insert(tk.END , content)
     self['state'] = tk.DISABLED
     self.see(tk.END)
     return StringIO.write(self.stream, content)
@@ -47,16 +73,12 @@ def set_stream(self):
         else:
             raise NotImplementedError(f"{self} is missing {name}")
 
-
-
 default_methods = {
-    "__iter__":__iter__, 
     "read":read,
     "write":write, 
-    "close":close
-    }
+    "close":close}
 
-stdin = stringio()
+
 stdout = stringio()
 stderr = stringio()
 new_stream = stringio.set

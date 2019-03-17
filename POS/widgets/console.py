@@ -66,7 +66,6 @@ class Terminal(Input):
 from lib.metaclass import WidgetType
 from lib.stream import StreamType
 from lib import stderr
-from lib import stdin
 from lib import stdout
 
 # resolve metaclass conflict
@@ -78,7 +77,6 @@ class console_stdout(tk.Text, metaclass=ConsoleType):
 
     font = ("Courier", 10)
     font_height = 6
-    font_width = 80
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent,
@@ -86,7 +84,8 @@ class console_stdout(tk.Text, metaclass=ConsoleType):
                 highlightthickness=0,
                 bd=0,
                 bg="grey26",
-                fg="white")
+                fg="white",
+                **kwargs)
 
         # console_stdout.stream defined by ConsoleType
         # add existing contents of stream to tk.Text widget
@@ -96,64 +95,14 @@ class console_stdout(tk.Text, metaclass=ConsoleType):
         # instance takes ownership of the stream
         self.set_stream() # pylint: disable=E1101
 
+
 # exactly the same as console_stdout but instance takes ownership of stderr
 class console_stderr(console_stdout, metaclass=ConsoleType, stream=stderr):
     font = ("Courier", 10)
     font_height = 6
     font_weidth = 80
 
-class console_stdin(tk.Entry, metaclass=ConsoleType, stream=stdin):
 
-    font=("Courier", 10)
-    font_width = 80
-
-    def __init__(self, parent, state=True, **kwargs):
-        super().__init__(parent,
-                width=self.font_width,
-                bg="grey26",
-                fg="white",
-                insertbackground="white",
-                highlightthickness=0,
-                bd=0,
-                relief=tk.FLAT,
-                font=self.font)
-        stringvar = tk.StringVar(parent)
-        self.configure(textvariable=stringvar)
-        self.set = stringvar.set
-        self.get = stringvar.get
-        self.state = state
-        if not self.state:
-            self['state'] = tk.DISABLED
-        self.set_stream() # pylint: disable=E1101
-        self.bind("<Return>", self._on_enter)
-        self._echo = None
-
-
-    @property
-    def echo(self):
-        """show stdin inputs"""
-        return self._echo
-    
-    @echo.setter
-    def echo(self, fp):
-        assert hasattr(fp, "write")
-        self._echo = fp
-
-    # non-default implementations of __iter__ and write
-    async def __iter__(self):
-        async for line in self.read().split("\n"): # pylint: disable=E1101
-            yield line
-    
-    def write(self, content):
-        if self.echo is not None:
-            self.echo.write(content)
-        type(self.stream).write(self.stream, content) # pylint: disable=E1101
-
-    # when the user presses the Return/Enter key,
-    # contents of <class tk.StringVar> is flushed to stdin stream
-    def _on_enter(self, *args):
-        self.write(self.get() + "\n")
-        self.set("")
 
 from lib import TabbedFrame
 from tkinter import ttk
@@ -161,8 +110,8 @@ from tkinter import ttk
 class Console(TabbedFrame, metaclass=WidgetType, device="POS"):        
     tabfont = ("Courier", 10)
     
-    def __init__(self, parent, enable_stdin=True, **kwargs):
-        super().__init__(parent, "stdout", "stderr", **kwargs)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, "stdout", "stderr", "settings", **kwargs)
         style = ttk.Style(self)
         style.configure("TNotebook.Tab", font=self.tabfont, padding=1)
         style.configure("TNotebook", padding=-1)
@@ -174,24 +123,14 @@ class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
                 yscrollcommand=stdout_scrollbar.set)
         stderr_textbox = console_stderr(self["stderr"], 
                 yscrollcommand=stderr_scrollbar.set)
-        
+
+        stdout_scrollbar["command"] = stdout_textbox.yview
+        stderr_scrollbar["command"] = stderr_textbox.yview
+
         self["stdout"].grid_columnconfigure(0, weight=1)
         self["stderr"].grid_columnconfigure(0, weight=1)
-
-        stdout_scrollbar["command"] = stdout_textbox.yview_moveto
-        stderr_scrollbar["command"] = stderr_textbox.yview_moveto
 
         stdout_textbox.grid(row=0, column=0, sticky="nswe")
         stderr_textbox.grid(row=0, column=0, sticky="nswe")
         stdout_scrollbar.grid(row=0, column=1, sticky="nse")
         stderr_scrollbar.grid(row=0, column=1, sticky="nse")
-
-        self.stdin = console_stdin(self, state=enable_stdin)
-        self.stdin.grid(row=1, column=0, sticky="we")
-
-    @property
-    def echo(self):
-        return self.stdin._echo
-    @echo.setter
-    def echo(self, value):
-        self.stdin._echo = value

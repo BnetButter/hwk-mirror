@@ -4,32 +4,36 @@ from lib import Order
 from lib import WidgetType, MenuWidget
 from lib import Ticket
 from lib import ToggleSwitch
-from lib import LOGNAME_GUI_STDERR, LOGNAME_GUI_STDOUT
+from lib import AsyncWindow
+from lib import update
+from lib import write_enable
 from functools import partial
 from tkinter import ttk
 import tkinter as tk
 import asyncio
 import logging
 
-logger = logging.getLogger()
 
-
-
-class OptionLabel(tk.Label, metaclass=MenuWidget, device="POS"):
+class OptionLabel(tk.Text, metaclass=MenuWidget, device="POS"):
     font = ("Courier", 12)
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, 
             font=self.font,
-            width=OptionLabel.longest_item,
+            width=20,
+            state=tk.DISABLED,
+            relief=tk.FLAT,
+            bg=parent["bg"],
             **kwargs)
     
+    @write_enable
     def _update(self, item:Ticket):
+        self.delete("1.0", tk.END)
         selected_options = "\n".join([
             f"        + {option}"
                 for option in item.selected_options])
-        self["text"] = selected_options
-
+        self.insert(tk.END, selected_options)
+        self["height"] = len(item.selected_options)
 
 class EditOptions(tk.Toplevel, metaclass=MenuWidget, device="POS"):
     font = ("Courier", 12, "bold")
@@ -68,9 +72,8 @@ class EditOptions(tk.Toplevel, metaclass=MenuWidget, device="POS"):
         close.grid(row=row, column=0, pady=10, padx=5, sticky="nswe")
 
     def destroy(self, *args):
-        selected_options = [toggle["text"] for toggle in self.toggles if toggle]
-        self.ticket.selected_options.clear()
-        self.ticket.selected_options.extend(selected_options)
+        self.ticket.selected_options = \
+                [toggle["text"] for toggle in self.toggles if toggle]
         super().destroy()
 
     @classmethod
@@ -114,7 +117,6 @@ class PriceButton(tk.Button, metaclass=WidgetType, device="POS"):
                 width=len("$ 000.00"),
                 anchor=tk.W,
                 **kwargs)
-        
 
     def _update(self, ticket):
         assert isinstance(ticket, Ticket)
@@ -128,8 +130,6 @@ class PriceButton(tk.Button, metaclass=WidgetType, device="POS"):
             self["text"] = ""
             self["relief"] = tk.FLAT
             self["state"] = tk.DISABLED
-
-
 
 class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
 
@@ -190,7 +190,7 @@ class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
     
 class OrdersFrame(ScrollFrame):
 
-    def __init__(self, parent, height=None, **kwargs):
+    def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.tickets = []
         
@@ -200,23 +200,18 @@ class OrdersFrame(ScrollFrame):
         null_frame = TicketFrame(self.interior)
         null_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
         null_frame.lower()
-        asyncio.get_event_loop().create_task(self.update_order_list())
-        
+        AsyncWindow.append(self.update_order_list)
 
-    async def update_order_list(self):
-        while True:
-            if len(self.tickets) < len(Order()):
-                self.tickets.append(TicketFrame(self.interior))
-    
-            for i, ticket in enumerate(self.tickets):                
-                ticket._update(i)
-                ticket.grid(row=i, column=0,
-                        columnspan=2,
-                        padx=5,
-                        sticky="we")
+    @update
+    def update_order_list(self):
+        if len(self.tickets) < len(Order()):
+            self.tickets.append(TicketFrame(self.interior))
 
-            await asyncio.sleep(1/60)
+        for i, ticket in enumerate(self.tickets):                
+            ticket._update(i)
+            ticket.grid(row=i, column=0,
+                    columnspan=2,
+                    padx=5,
+                    sticky="we")
 
 
-
-        

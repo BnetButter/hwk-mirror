@@ -1,5 +1,4 @@
 from lib import tkwidgets
-from lib.tkwidgets import TextWidget
 from lib.tkwidgets import LabelButton
 from lib import MenuType
 from lib import WidgetType

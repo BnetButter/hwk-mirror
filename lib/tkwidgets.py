@@ -1,21 +1,44 @@
 from tkinter import ttk
-import tkinter as tk
+from functools import wraps
 from collections import UserDict
 from io import StringIO
-import lib
+import asyncio
+import tkinter as tk
 
-class TextWidget(tk.Frame):
-    font = ("Courier", 12)
-    
+from .metaclass import AsyncWindowType
+from .data import log_info
+
+class AsyncWindow(tk.Tk, metaclass=AsyncWindowType):
+
+    def __init__(self, screenName=None, baseName=None, className="tk"):
+        super().__init__(screenName, baseName, className)
+        self.bind("<Escape>", self.destroy)
+
+    @log_info("System initiated", time=True)
+    def mainloop(self):
+        async def update():
+            while True:
+                self.update()
+                await asyncio.sleep(AsyncWindow.interval)
+        AsyncWindow.append(update)
+        asyncio.get_event_loop().run_forever()
+
+    @log_info("Exiting", time=True)
+    def destroy(self, *args):
+        for task in self.data:
+            task.cancel()
+        self.loop.stop()
+        super().destroy()
+
 class LabelButton(tk.Label):
 
-    def __init__(self, parent, text, command=None, **kwargs):
+    def __init__(self, parent, text, command=lambda *args:None, **kwargs):
         super().__init__(parent, text=text, **kwargs)
         self.command = command
         self.configure(bd=2, relief=tk.RAISED)
         self.bind("<Button-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
-    
+
     def deactivate(self):
         self.unbind("<Button-1>")
         self.unbind("<ButtonRelease-1>")
@@ -29,11 +52,15 @@ class LabelButton(tk.Label):
 
 class ToggleSwitch(LabelButton):
 
-    def __init__(self, parent, text, default="grey", state=False, **kwargs):
+    def __init__(self, parent, text, default="grey",state=False,
+                config_true={"relief": tk.SUNKEN, "bg":"green"},
+                config_false={"relief": tk.RAISED, "bg":"grey"}, **kwargs):
         super().__init__(parent, text, self._cmd, bg=default, **kwargs)
         self._state = None
+        self.config_true = config_true
+        self.config_false = config_false
         self.state = state
-    
+
     @property
     def state(self):
         return self._state
@@ -42,9 +69,9 @@ class ToggleSwitch(LabelButton):
     def state(self, value:bool):
         self._state = value
         if value:
-            self.configure(relief=tk.SUNKEN, bg="green")
+            self.configure(**self.config_true)
         else:
-            self.configure(relief=tk.RAISED, bg="grey")
+            self.configure(**self.config_false)
     
     def __bool__(self):
         return self.state
@@ -180,3 +207,32 @@ class TabbedFrame(tk.Frame):
     
     def __getitem__(self, key):
         return self.data[key]
+
+
+def write_enable(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        self["state"] = tk.NORMAL
+        func(*args, **kwargs)
+        self["state"] = tk.DISABLED
+    return wrapper
+
+
+
+def update(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        while True:
+            func(*args, **kwargs)
+            await asyncio.sleep(1/60)
+    return wrapper
+
+def async_update(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        while True:
+            await func(*args, **kwargs)
+            await asyncio.sleep(1/60)
+    return wrapper
+    

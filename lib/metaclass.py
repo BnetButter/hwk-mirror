@@ -7,6 +7,8 @@ from operator import itemgetter
 from .data import MENUDATA
 from .data import CONFIGDATA
 from .stream import stdout, stderr
+import tkinter as tk
+import asyncio
 import logging
 
 logger = logging.getLogger("gui")
@@ -44,6 +46,8 @@ class MenuType(type):
         self.include_drinks = self.config["Drinks Included"]
         self.two_sides = self.config["Two Sides"]
         self.no_addons = self.config["No Addons"]
+        self.register = self.config["Register"]
+        self.payment_types = self.config["Payment Types"]
 
     @property
     def all_item_names(self):
@@ -75,6 +79,7 @@ class MenuType(type):
     @property
     def taxrate(self):
         return Decimal(self.config["Tax"]).quantize(Decimal('.01'))
+    
     
     def category(self, category, cls=MenuItem):
         """return a list of menu items"""
@@ -126,11 +131,20 @@ class OrderInterface(MenuType, UserList):
         return cls.instance
 
     def __str__(self):
-        return str(self.data)
+        lines = list()
+        for ticket in self.orders:
+            lines.append(str(ticket))
+        return "\n".join(lines)
+
+    def complete(self):
+        pass
 
     def remove(self, item):
         super().remove(item)
         logger.info(f"Removed ticket: {item.name, item.addon1.name, item.addon2.name}")
+    
+    def to_dict(self):
+        pass
 
     @property
     def data(self):
@@ -152,6 +166,37 @@ class OrderInterface(MenuType, UserList):
     @property
     def tax(self)->int:
         return self.total - self.subtotal
+
+class AsyncWindowType(type, UserList):
+    """Create a singleton tkinter.Tk object"""
+    instance = None
+
+    def __new__(cls, name, bases, attr, refresh=None, *args, **kwargs):
+        return super().__new__(cls, name, (tk.Tk,), attr)
+        
+    def __init__(self, name, bases, attr, refresh=None, *args, **kwargs):
+        super().__init__(name, bases, attr, *args, **kwargs)
+        self.data = list()
+        self.loop = asyncio.get_event_loop()
+        if refresh is None:
+            refresh = 60
+        elif not isinstance(refresh, int):
+            raise TypeError(f"Expected {int} as 'refresh' argument. Got {type(refresh)} instead.")
+        self.interval = 1 / refresh
+
+    def append(self, coroutine, *args, **kwargs):
+        coroutine = self.loop.create_task(
+                coroutine(*args, **kwargs))
+        self.data.append(coroutine)
+    
+    def __call__(self, *args, **kwargs):
+        if self.instance is None:
+            self.instance = super().__call__(*args, **kwargs)
+        return self.instance
+    
+    def exit(self):
+        if self.instance is not None:
+            self.instance.destroy()
 
 
 # resolve metaclas conflict

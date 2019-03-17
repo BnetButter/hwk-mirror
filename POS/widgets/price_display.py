@@ -1,11 +1,12 @@
 from lib import WidgetType
+from lib import AsyncWindow
 from lib import Order
 import tkinter as tk
 import asyncio
 
 
 class PriceEntry(tk.Frame, metaclass=WidgetType, device="POS"):
-    font=("Courier", 14)
+    font=("Courier", 20)
 
     def __init__(self, parent, text, textvariable, **kwargs):
         super().__init__(parent, **kwargs)
@@ -51,8 +52,7 @@ class PriceDisplay(tk.Frame):
                     padx=5,
                     columnspan=2)
         
-        asyncio.get_event_loop().create_task(
-                self._update())
+        AsyncWindow.append(self._update)
     
     async def _update(self):
         fmt = "$ {:.2f}"
