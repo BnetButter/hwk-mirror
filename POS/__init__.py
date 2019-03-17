@@ -1,2 +1,2 @@
 from .widgets import *
-from .server import *
+from . import client

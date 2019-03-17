@@ -225,8 +225,6 @@ class AsyncWindowType(type, UserList):
 class ServerInterface(ABCMeta, type):
 
     instance = None
-    connect = websockets.connect(f"ws://{CONFIGDATA['ip']}:{CONFIGDATA['port']}")
-
     def __new__(cls, name, bases, attr):
         if cls.instance is None:
             cls.instance = super().__new__(cls, name, bases, attr)

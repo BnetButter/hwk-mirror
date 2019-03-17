@@ -1,4 +1,9 @@
-PYTHON =/usr/local/bin/python3.7
+PYTHON =/home/bnetbutter/.env/hwk/bin/python3.7
+ACTIVATE = /home/bnetbutter/.env/hwk/bin/activate
 
-all:
+
+all: activate
 	$(PYTHON) main.py
+
+activate:
+	/bin/bash $(ACTIVATE) hwk

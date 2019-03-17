@@ -20,3 +20,5 @@ except:
     with open(CONFIGPATH, "w") as fp:
         dump(DEFAULT_MENU, fp, indent=4)
     CONFIGDATA = DEFAULT_MENU
+
+address = f"ws://{CONFIGDATA['ip']}:{CONFIGDATA['port']}"
