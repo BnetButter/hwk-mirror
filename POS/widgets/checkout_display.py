@@ -221,6 +221,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
+        self.num_payment_types = len(CheckoutFrame.payment_types)
         self._ticket = tk.StringVar(self)
         self.ticket_number(relief=tk.RIDGE, bd=2).grid(
                 row=0,
@@ -264,26 +265,21 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
         entry.grid(row=0, column=1, sticky="nswe")
         return frame
 
-    async def update_order_list(self):
+    @AsyncWindow.update_function
+    def update_order_list(self):
+        grid_offset = self.num_payment_types
+        num_tickets = len(Order())
 
-        while True:
-            grid_offset = len(CheckoutFrame.payment_types)
-            num_tickets = len(Order())
-            if len(self.tickets) < num_tickets:
-                    self.tickets.append(CheckoutTicketFrame(self.interior, bd=2, relief=tk.RIDGE))
-            for i, ticket in enumerate(self.tickets):  
-                if i < num_tickets:
-                    ticket._update(i)
-                    ticket.grid(row=i + grid_offset + 3,
-                            column=0,
-                            padx=10,
-                            pady=5,
-                            sticky="nswe")
-                else:
-                    ticket.grid_forget()
-            await asyncio.sleep(1/60)
-    
-
-
-
-
+        if len(self.tickets) < num_tickets:
+                self.tickets.append(CheckoutTicketFrame(self.interior, bd=2, relief=tk.RIDGE))
+        
+        for i, ticket in enumerate(self.tickets):
+            if i < num_tickets:
+                ticket._update(i)
+                ticket.grid(row=i + grid_offset + 3,
+                        column=0,
+                        padx=10,
+                        pady=5,
+                        sticky="nswe")
+            else:
+                ticket.grid_forget()

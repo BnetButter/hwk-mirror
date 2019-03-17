@@ -56,19 +56,21 @@ class TimeVariable(tuple):
         month.set(lc[1])
 
         day_var = tk.StringVar(parent)
+        day_var.set(lc[2])
         day = tk.Entry(parent, textvariable=day_var, width=3, font=font)
         object.__setattr__(day, "set", day_var.set)
         object.__setattr__(day, "get", day_var.get)
-        day.set(lc[2])
+        
         
         hour = ttk.Combobox(parent, values=hour, width=3, font=font)
         hour.set(strftime("%I", lc))
         
         minute_var = tk.StringVar(parent)
+        minute_var.set(lc[4])
         minute = tk.Entry(parent, textvariable=minute_var, width=2, font=font)
         object.__setattr__(minute, "set", minute_var.set)
         object.__setattr__(minute, "get", minute_var.get)
-        minute.set(lc[4])
+    
 
         ampm = ttk.Combobox(parent, values=["AM", "PM"], width=3, font=font)
         ampm.set("AM")

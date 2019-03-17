@@ -4,9 +4,12 @@ from collections import UserDict
 from io import StringIO
 import asyncio
 import tkinter as tk
-
+import logging
 from .metaclass import AsyncWindowType
 from .data import log_info
+from .data import GUI_STDERR
+
+logger = logging.getLogger(GUI_STDERR)
 
 class AsyncWindow(tk.Tk, metaclass=AsyncWindowType):
 
@@ -16,9 +19,26 @@ class AsyncWindow(tk.Tk, metaclass=AsyncWindowType):
 
     @log_info("System initiated", time=True)
     def mainloop(self):
+        
+        log_at = 1 / AsyncWindow.interval
         async def update():
+            counter = 0
             while True:
+                if counter == log_at:
+                    counter = 0
+            
+                if counter: 
+                    [update() for update in AsyncWindow.update_tasks]
+            
+                else: # log exception once per second
+                    for update in AsyncWindow.update_tasks:
+                        try:
+                            update()
+                        except:
+                            logger.exception(f"{update.__name__} failed.")
+        
                 self.update()
+                counter += 1
                 await asyncio.sleep(AsyncWindow.interval)
         AsyncWindow.append(update)
         asyncio.get_event_loop().run_forever()

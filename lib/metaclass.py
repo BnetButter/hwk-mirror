@@ -1,4 +1,5 @@
 from functools import partial
+from functools import wraps
 from collections import UserList
 from abc import ABCMeta
 from decimal import Decimal
@@ -9,6 +10,7 @@ from .data import CONFIGDATA
 from .stream import stdout, stderr
 import tkinter as tk
 import asyncio
+import websockets
 import logging
 
 logger = logging.getLogger("gui")
@@ -107,7 +109,7 @@ class WidgetType(type):
         
         # instance must specify some font variable
         if name not in config[device].keys() and not fonts:
-            raise Exception(f"Missing configurations for '{name}'")
+            raise Exception(f"Missing font configurations for '{name}'")
         elif name not in config[device].keys():
             config[device][name] = dict()
         
@@ -168,7 +170,7 @@ class OrderInterface(MenuType, UserList):
         return self.total - self.subtotal
 
 class AsyncWindowType(type, UserList):
-    """Create a singleton tkinter.Tk object"""
+    """Create a singleton async tkinter.Tk class"""            
     instance = None
 
     def __new__(cls, name, bases, attr, refresh=None, *args, **kwargs):
@@ -177,6 +179,7 @@ class AsyncWindowType(type, UserList):
     def __init__(self, name, bases, attr, refresh=None, *args, **kwargs):
         super().__init__(name, bases, attr, *args, **kwargs)
         self.data = list()
+        self.update_tasks = list()
         self.loop = asyncio.get_event_loop()
         if refresh is None:
             refresh = 60
@@ -189,6 +192,26 @@ class AsyncWindowType(type, UserList):
                 coroutine(*args, **kwargs))
         self.data.append(coroutine)
     
+    def add_update_task(self, func):
+        self.update_tasks.append(func)
+    
+
+    def update_function(self, func):
+        assert not asyncio.iscoroutinefunction(func)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            self.update_tasks.append(partial(func, *args, **kwargs))
+        return wrapper
+
+    def async_update_task(self, func):
+        assert asyncio.iscoroutinefunction(func)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            func = self.loop.create_task(
+                    func(*args, **kwargs))
+            self.data.append(func)
+        return wrapper
+
     def __call__(self, *args, **kwargs):
         if self.instance is None:
             self.instance = super().__call__(*args, **kwargs)
@@ -198,6 +221,24 @@ class AsyncWindowType(type, UserList):
         if self.instance is not None:
             self.instance.destroy()
 
+
+class ServerInterface(ABCMeta, type):
+
+    instance = None
+    connect = websockets.connect(f"ws://{CONFIGDATA['ip']}:{CONFIGDATA['port']}")
+
+    def __new__(cls, name, bases, attr):
+        if cls.instance is None:
+            cls.instance = super().__new__(cls, name, bases, attr)
+        return cls.instance
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loop = asyncio.get_event_loop()
+        self.serve = partial(self._serve, ip=CONFIGDATA["ip"], port=CONFIGDATA["port"])
+
+    def _serve(self, handler, ip=None, port=None):
+        return websockets.serve(handler, ip, port)
 
 # resolve metaclas conflict
 class MenuWidget(WidgetType, MenuType):

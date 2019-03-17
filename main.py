@@ -35,8 +35,6 @@ def pos():
     main.grid_rowconfigure(1, weight=1)
     main.resizable(False, False)
 
-    Event(print=lambda message: print(message))
-    
     network_status = NetworkStatus(main, bd=2)    
     shutdown_button = ShutdownButton(main, bg="red")
 
@@ -52,6 +50,7 @@ def pos():
     console.grid(row=2, column=0, pady=5, sticky="nswe")
     price_display = PriceDisplay(main, relief=tk.RIDGE, bd=2)
     price_display.grid(row=2, column=1)
+    
     main.mainloop()
 
 def server_init():
@@ -61,5 +60,5 @@ def server_init():
     current_time.grid(row=0, column=0, sticky="nswe")
     main.mainloop()
 
-server_init()
+pos()
 

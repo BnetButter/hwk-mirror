@@ -52,12 +52,10 @@ class PriceDisplay(tk.Frame):
                     padx=5,
                     columnspan=2)
         
-        AsyncWindow.append(self._update)
+        self._update("$ {:.2f}")
     
-    async def _update(self):
-        fmt = "$ {:.2f}"
-        while True:
-            self.subtotal_var.set(fmt.format(Order().subtotal / 100))
-            self.tax_var.set(fmt.format(Order().tax / 100))
-            self.total_var.set(fmt.format(Order().total / 100))
-            await asyncio.sleep(1/60)
+    @AsyncWindow.update_function
+    def _update(self, fmt):
+        self.subtotal_var.set(fmt.format(Order().subtotal / 100))
+        self.tax_var.set(fmt.format(Order().tax / 100))
+        self.total_var.set(fmt.format(Order().total / 100))

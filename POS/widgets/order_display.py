@@ -200,9 +200,9 @@ class OrdersFrame(ScrollFrame):
         null_frame = TicketFrame(self.interior)
         null_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
         null_frame.lower()
-        AsyncWindow.append(self.update_order_list)
-
-    @update
+        self.update_order_list()
+    
+    @AsyncWindow.update_function
     def update_order_list(self):
         if len(self.tickets) < len(Order()):
             self.tickets.append(TicketFrame(self.interior))
