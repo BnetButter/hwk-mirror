@@ -1,7 +1,7 @@
 from lib import gettime
 from lib import WidgetType
-from lib import AsyncWindow
 from lib import update
+from lib import AsyncTk
 from lib import LabelButton
 from tkinter import ttk
 from time import strftime, localtime
@@ -28,7 +28,6 @@ class ServerTime(tk.Frame, metaclass=WidgetType, device="Server"):
         entry.grid(row=0, column=1, sticky="nswe")
         self.set = variable.set
         self.get = variable.get
-        AsyncWindow.append(self.update_time)
 
     async def update_time(self):
         while True:
@@ -153,7 +152,7 @@ class ServerFrame(tk.Frame):
                         padx=5), font=current_time.font)
 
         button.grid(row=0, column=1, pady=5, padx=5, sticky="nswe")
-        confirm = LabelButton(self, text="Confirm", bg="green", command=AsyncWindow.exit)
+        confirm = LabelButton(self, text="Confirm", bg="green")
         confirm.grid(row=2, column=0)
 
         

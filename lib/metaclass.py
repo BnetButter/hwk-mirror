@@ -2,18 +2,20 @@ from functools import partial
 from functools import wraps
 from collections import UserList
 from abc import ABCMeta
+from abc import abstractmethod
 from decimal import Decimal
 from decimal import ROUND_HALF_DOWN
 from operator import itemgetter
 from .data import MENUDATA
 from .data import CONFIGDATA
-from .stream import stdout, stderr
+from .data import GUI_STDOUT
 import tkinter as tk
 import asyncio
 import websockets
 import logging
 
-logger = logging.getLogger("gui")
+
+logger = logging.getLogger(GUI_STDOUT)
 
 class MenuItem(tuple):
     def __new__(self, category, name, price, options):
@@ -31,6 +33,37 @@ class MenuItem(tuple):
     price = property(itemgetter(2))
     options = property(itemgetter(3))
 
+class Ticket(MenuItem):
+
+    def __new__(cls, menu_item, selected_options=None, parameters={}):
+        
+        if selected_options is None:
+            return tuple.__new__(cls, (*menu_item, list(), parameters))
+        else:
+            assert all(option in menu_item[3] for option in selected_options)
+            return tuple.__new__(cls, (*menu_item, list(selected_options), parameters))
+    
+    def __bool__(self):
+        return self.total > 0
+
+    @property
+    def total(self):
+        total = self.price
+        for option in self.selected_options:
+            total += self.options[option]
+        return total
+
+    @property
+    def selected_options(self):
+        return self[4]
+    
+    @selected_options.setter
+    def selected_options(self, value):
+        assert all(option in self.options.keys() for option in value)
+        self.selected_options.clear()
+        self.selected_options.extend(value)
+
+    parameters = property(itemgetter(5))
 
 class MenuType(type):
     """Provides a class with an interface to menu information"""
@@ -169,58 +202,6 @@ class OrderInterface(MenuType, UserList):
     def tax(self)->int:
         return self.total - self.subtotal
 
-class AsyncWindowType(type, UserList):
-    """Create a singleton async tkinter.Tk class"""            
-    instance = None
-
-    def __new__(cls, name, bases, attr, refresh=None, *args, **kwargs):
-        return super().__new__(cls, name, (tk.Tk,), attr)
-        
-    def __init__(self, name, bases, attr, refresh=None, *args, **kwargs):
-        super().__init__(name, bases, attr, *args, **kwargs)
-        self.data = list()
-        self.update_tasks = list()
-        self.loop = asyncio.get_event_loop()
-        if refresh is None:
-            refresh = 60
-        elif not isinstance(refresh, int):
-            raise TypeError(f"Expected {int} as 'refresh' argument. Got {type(refresh)} instead.")
-        self.interval = 1 / refresh
-
-    def append(self, coroutine, *args, **kwargs):
-        coroutine = self.loop.create_task(
-                coroutine(*args, **kwargs))
-        self.data.append(coroutine)
-    
-    def add_update_task(self, func):
-        self.update_tasks.append(func)
-    
-
-    def update_function(self, func):
-        assert not asyncio.iscoroutinefunction(func)
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            self.update_tasks.append(partial(func, *args, **kwargs))
-        return wrapper
-
-    def async_update_task(self, func):
-        assert asyncio.iscoroutinefunction(func)
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            func = self.loop.create_task(
-                    func(*args, **kwargs))
-            self.data.append(func)
-        return wrapper
-
-    def __call__(self, *args, **kwargs):
-        if self.instance is None:
-            self.instance = super().__call__(*args, **kwargs)
-        return self.instance
-    
-    def exit(self):
-        if self.instance is not None:
-            self.instance.destroy()
-
 
 class ServerInterface(ABCMeta, type):
 
@@ -237,6 +218,7 @@ class ServerInterface(ABCMeta, type):
 
     def _serve(self, handler, ip=None, port=None):
         return websockets.serve(handler, ip, port)
+
 
 # resolve metaclas conflict
 class MenuWidget(WidgetType, MenuType):

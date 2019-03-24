@@ -1,2 +1,2 @@
 from .widgets import *
-from . import client
+from .pos_client import POSProtocol

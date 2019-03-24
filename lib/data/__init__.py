@@ -21,4 +21,8 @@ except:
         dump(DEFAULT_MENU, fp, indent=4)
     CONFIGDATA = DEFAULT_MENU
 
-address = f"ws://{CONFIGDATA['ip']}:{CONFIGDATA['port']}"
+
+router_ip = CONFIGDATA["router"]
+device_ip = CONFIGDATA["ip"]
+port = CONFIGDATA["port"]
+address = f"ws://{device_ip}:{port}"

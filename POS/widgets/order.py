@@ -1,44 +1,15 @@
 from operator import itemgetter
-from .metaclass import MenuItem
-from .metaclass import MenuType
-from .metaclass import OrderInterface
-from .data import SYS_STDOUT
-from .data import log_info
+from lib import MenuItem
+from lib import MenuType
+from lib import OrderInterface
+from lib import SYS_STDOUT
+from lib import log_info
+from lib import Ticket
 import logging
 
 logger = logging.getLogger(SYS_STDOUT)
 
-class Ticket(MenuItem):
 
-    def __new__(cls, menu_item, selected_options=None, parameters={}):
-        
-        if selected_options is None:
-            return tuple.__new__(cls, (*menu_item, list(), parameters))
-        else:
-            assert all(option in menu_item[3] for option in selected_options)
-            return tuple.__new__(cls, (*menu_item, list(selected_options), parameters))
-    
-    def __bool__(self):
-        return self.total > 0
-
-    @property
-    def total(self):
-        total = self.price
-        for option in self.selected_options:
-            total += self.options[option]
-        return total
-
-    @property
-    def selected_options(self):
-        return self[4]
-    
-    @selected_options.setter
-    def selected_options(self, value):
-        assert all(option in self.options.keys() for option in value)
-        self.selected_options.clear()
-        self.selected_options.extend(value)
-
-    parameters = property(itemgetter(5))
 
 
 def new(cls, menu_item, addon1, addon2, selected_options=None):
@@ -87,6 +58,7 @@ def __str__(self):
     return "\n".join(lines)
 
 
+@log_info("Created new order", time=True)
 def NewOrder():
     return OrderInterface("Orders", (Ticket,), {
         "__new__": new,

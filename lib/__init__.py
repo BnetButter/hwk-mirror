@@ -1,10 +1,10 @@
 from .metaclass import *
 from .data import *
-from .ticket import *
 from .tkwidgets import *
 from .stream import *
-from .abstractserver import *
-from .event_manager import Event
+from .tkinterface import *
+from .abstract import *
+from .globalstate import GlobalState
 import logging
 
 # loggers targeting the gui output widget

@@ -5,50 +5,10 @@ from io import StringIO
 import asyncio
 import tkinter as tk
 import logging
-from .metaclass import AsyncWindowType
 from .data import log_info
 from .data import GUI_STDERR
 
 logger = logging.getLogger(GUI_STDERR)
-
-class AsyncWindow(tk.Tk, metaclass=AsyncWindowType):
-
-    def __init__(self, screenName=None, baseName=None, className="tk"):
-        super().__init__(screenName, baseName, className)
-        self.bind("<Escape>", self.destroy)
-
-    @log_info("System initiated", time=True)
-    def mainloop(self):
-        
-        log_at = 1 / AsyncWindow.interval
-        async def update():
-            counter = 0
-            while True:
-                if counter == log_at:
-                    counter = 0
-            
-                if counter: 
-                    [update() for update in AsyncWindow.update_tasks]
-            
-                else: # log exception once per second
-                    for update in AsyncWindow.update_tasks:
-                        try:
-                            update()
-                        except:
-                            logger.exception(f"{update.__name__} failed.")
-        
-                self.update()
-                counter += 1
-                await asyncio.sleep(AsyncWindow.interval)
-        AsyncWindow.append(update)
-        asyncio.get_event_loop().run_forever()
-
-    @log_info("Exiting", time=True)
-    def destroy(self, *args):
-        for task in self.data:
-            task.cancel()
-        self.loop.stop()
-        super().destroy()
 
 class LabelButton(tk.Label):
 
@@ -56,6 +16,10 @@ class LabelButton(tk.Label):
         super().__init__(parent, text=text, **kwargs)
         self.command = command
         self.configure(bd=2, relief=tk.RAISED)
+        self.bind("<Button-1>", self.on_click)
+        self.bind("<ButtonRelease-1>", self.on_release)
+
+    def activate(self):
         self.bind("<Button-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
 
@@ -240,19 +204,3 @@ def write_enable(func):
 
 
 
-def update(func):
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        while True:
-            func(*args, **kwargs)
-            await asyncio.sleep(1/60)
-    return wrapper
-
-def async_update(func):
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        while True:
-            await func(*args, **kwargs)
-            await asyncio.sleep(1/60)
-    return wrapper
-    

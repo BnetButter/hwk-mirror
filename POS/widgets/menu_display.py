@@ -4,7 +4,7 @@ from lib import MenuType
 from lib import WidgetType
 from lib import MenuWidget
 from lib import MenuItem
-from lib import Order
+from .order import Order
 import lib
 import tkinter as tk
 

@@ -33,7 +33,7 @@ ITALIC = 3
 UNDERLINE = 4
 
 
-ASCIITIME = "%(asciitime)s"
+ASCIITIME = "%(asctime)s"
 FUNC_NAME = "%(funcName)s"
 LEVEL_NAME = "%(levelname)s"
 LINE_NO = "%(lineno)s"
@@ -73,7 +73,18 @@ def log_info(message, name=GUI_STDOUT, time=False):
         return wrapper
     return decorator
 
-
+def log_warning(message, name=GUI_STDERR, time=False):
+    logger = logging.getLogger(name)
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            _time = ""
+            if time:
+                _time = gettime() + " - "
+            logger.warning(f"{_time}{message}")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 def black(string, effect=1):
     return ESC + BLACK.format(effect) + string + END

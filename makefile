@@ -7,3 +7,6 @@ all: activate
 
 activate:
 	/bin/bash $(ACTIVATE) hwk
+
+kill:
+	$(PYTHON) main.py kill

@@ -1,17 +1,18 @@
 from lib import ScrollFrame
 from lib import TabbedFrame
-from lib import Order
-from lib import WidgetType, MenuWidget
+from .order import Order
 from lib import Ticket
+from lib import WidgetType, MenuWidget
 from lib import ToggleSwitch
-from lib import AsyncWindow
-from lib import update
+from lib import AsyncTk, update
 from lib import write_enable
 from functools import partial
 from tkinter import ttk
+
 import tkinter as tk
 import asyncio
 import logging
+
 
 
 class OptionLabel(tk.Text, metaclass=MenuWidget, device="POS"):
@@ -27,7 +28,7 @@ class OptionLabel(tk.Text, metaclass=MenuWidget, device="POS"):
             **kwargs)
     
     @write_enable
-    def _update(self, item:Ticket):
+    def _update(self, item):
         self.delete("1.0", tk.END)
         selected_options = "\n".join([
             f"        + {option}"
@@ -99,7 +100,7 @@ class ItemLabel(tk.Label, metaclass=MenuWidget, device="POS"):
     def isaddon(self, value:bool):
         self._isaddon = value
 
-    def _update(self, ticket: Ticket):
+    def _update(self, ticket):
         if self.isaddon:
             self["text"] = "    " + ticket.name
         else:
@@ -119,7 +120,7 @@ class PriceButton(tk.Button, metaclass=WidgetType, device="POS"):
                 **kwargs)
 
     def _update(self, ticket):
-        assert isinstance(ticket, Ticket)
+
         if ticket.total > 0:
             self["state"] = tk.ACTIVE
             self["command"] = partial(Order().remove, ticket)
@@ -202,7 +203,7 @@ class OrdersFrame(ScrollFrame):
         null_frame.lower()
         self.update_order_list()
     
-    @AsyncWindow.update_function
+    @update
     def update_order_list(self):
         if len(self.tickets) < len(Order()):
             self.tickets.append(TicketFrame(self.interior))
@@ -213,5 +214,4 @@ class OrdersFrame(ScrollFrame):
                     columnspan=2,
                     padx=5,
                     sticky="we")
-
 

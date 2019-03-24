@@ -2,9 +2,9 @@ import tkinter as tk
 import sys
 import os
 from lib import LabelButton
+from lib import AsyncTk
 from lib import WidgetType
 from functools import partial
-from lib import AsyncWindow
 from lib import log_info
 from lib import stdout
 import asyncio
@@ -17,10 +17,9 @@ def shutdown():
             stdout.write(f"{counter}s", replace=3)
             await asyncio.sleep(1)
             counter -= 1
-        AsyncWindow.exit()
-        # send message to server to execute shutdown
-
-    AsyncWindow.append(_)
+        AsyncTk().destroy()
+        AsyncTk().forward("global_shutdown")
+    AsyncTk().add_task(_())
 
 @log_info("Program restart in 5", time=True)
 def reboot():
@@ -32,7 +31,7 @@ def reboot():
             counter -= 1
         main = sys.executable
         os.execl(main, main, *sys.argv)
-    AsyncWindow.append(_)
+    AsyncTk().add_task(_())
 
 class ShutdownButton(LabelButton, metaclass=WidgetType, device="POS"):
     font = ("Courier", 10)

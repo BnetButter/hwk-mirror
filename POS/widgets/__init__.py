@@ -11,6 +11,9 @@ from .checkout_display import CheckoutFrame
 from .network_status import NetworkStatus
 from logging import getLogger
 from .shutdown_button import *
+from .titlebar import titlebar
+
+from .order import Order, NewOrder
 
 class MenuDisplay(TabbedFrame, metaclass=MenuWidget, device="POS"):
     
@@ -53,4 +56,3 @@ class OrderDisplay(TabbedFrame, metaclass=MenuWidget, device="POS"):
         self["Orders    "] = OrdersFrame(self)
         self["Checkout  "] = CheckoutFrame(self)
         self["Processing"] = ScrollFrame(self)
-        

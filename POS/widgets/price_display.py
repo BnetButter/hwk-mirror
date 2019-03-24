@@ -1,6 +1,6 @@
 from lib import WidgetType
-from lib import AsyncWindow
-from lib import Order
+from .order import Order
+from lib import AsyncTk, update
 import tkinter as tk
 import asyncio
 
@@ -52,10 +52,10 @@ class PriceDisplay(tk.Frame):
                     padx=5,
                     columnspan=2)
         
-        self._update("$ {:.2f}")
-    
-    @AsyncWindow.update_function
-    def _update(self, fmt):
+        self.update_price("$ {:.2f}")
+
+    @update
+    def update_price(self, fmt):
         self.subtotal_var.set(fmt.format(Order().subtotal / 100))
         self.tax_var.set(fmt.format(Order().tax / 100))
         self.total_var.set(fmt.format(Order().total / 100))
