@@ -7,16 +7,13 @@ from lib import log_info
 from lib import Ticket
 import logging
 
-logger = logging.getLogger(SYS_STDOUT)
-
-
-
+logger = logging.getLogger()
 
 def new(cls, menu_item, addon1, addon2, selected_options=None):
     
-    param1 = {"register": menu_item.category in cls.register}
-    param2 = {"register": addon1.category in cls.register}
-    param3 = {"register": addon2.category in cls.register}
+    param1 = {"register": menu_item.category in cls.register, "status":None}
+    param2 = {"register": addon1.category in cls.register, "status": None}
+    param3 = {"register": addon2.category in cls.register, "status": None}
 
     addon1 = Ticket(addon1, parameters=param2)
     addon2 = Ticket(addon2, parameters=param3)    
@@ -72,3 +69,4 @@ def Order():
     if OrderInterface.instance is None:
         return NewOrder()
     return OrderInterface.instance
+

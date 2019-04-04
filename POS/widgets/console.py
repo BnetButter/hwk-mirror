@@ -75,7 +75,7 @@ class ConsoleType(StreamType, WidgetType):
 
 class console_stdout(tk.Text, metaclass=ConsoleType):
 
-    font = ("Courier", 10)
+    font = ("Courier",10)
     font_height = 6
 
     def __init__(self, parent, **kwargs):
@@ -85,6 +85,7 @@ class console_stdout(tk.Text, metaclass=ConsoleType):
                 bd=0,
                 bg="grey26",
                 fg="white",
+                font=self.font,
                 **kwargs)
 
         # console_stdout.stream defined by ConsoleType
@@ -100,7 +101,7 @@ class console_stdout(tk.Text, metaclass=ConsoleType):
 class console_stderr(console_stdout, metaclass=ConsoleType, stream=stderr):
     font = ("Courier", 10)
     font_height = 6
-    font_weidth = 80
+    font_width = 80
 
 
 

@@ -7,8 +7,10 @@ import pos
 import display
 import server
 
-from POS import POSProtocol
+from POS import POSProtocol, POSProtocolBase
 
+# TODO make delegate responsible for calculating total. 
+# adjust "OrderInterface" class accordingly
 
 def kill_server(port=None):
     """kill program connected to port"""
@@ -37,33 +39,31 @@ def kill_server(port=None):
             print(f"{port} is clear.")
 
 from POS import POSProtocol
-import functools
-
-switch = {
-    "pos": functools.partial(pos.main, POSProtocol),
-    "server": server.main,
-    "display": display.main
-}
-
-def process(arg):
-    result = switch.get(arg)
-    result()
 
 def main():
+
+    logger = logging.getLogger("main")
+    logger.setLevel(logging.DEBUG)
+    
+    handler = logging.StreamHandler(stream=sys.stdout)
+    handler.setFormatter(logging.Formatter("%(name)s - %(message)s"))
+    logger.addHandler(handler)
+    
+    logger.info("starting main")
+
+
+    pos_process = multiprocessing.Process(target=pos.main, args=(POSProtocol,))
+    server_process = multiprocessing.Process(target=server.main)
     try:
         arg = sys.argv[1]
         if arg == "kill":
-            kill_server(lib.CONFIGDATA["port"])
+            return kill_server(lib.CONFIGDATA["port"])
         else:
-            result = switch.get(arg, lambda: print(f"invalid argument {arg}"))
-            result()
-
+            {"pos":pos_process, "server": server_process}.get(sys.argv[1]).start()
+    
     except IndexError:
-        pool = multiprocessing.Pool(3)
-        pool.map(process, ["pos", "server", "display"])
-
-
+        server_process.start()
+        pos_process.start()
+    
 if __name__ == "__main__":
     main()
-
-

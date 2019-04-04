@@ -1,6 +1,6 @@
 from tkinter import ttk
-from functools import wraps
-from collections import UserDict
+from functools import wraps, partial
+from collections import UserDict, UserList
 from io import StringIO
 import asyncio
 import tkinter as tk
@@ -10,6 +10,26 @@ from .data import GUI_STDERR
 
 logger = logging.getLogger(GUI_STDERR)
 
+class WidgetCache(UserList):
+
+    def __init__(self, _class, parent, initial_size=10, *args, **kwargs):
+        self.cls = partial(_class, parent, *args, **kwargs)
+        self.data = [self.cls() for i in range(initial_size)]
+        self.initial_size = initial_size
+        self.size = initial_size
+    
+    def realloc(self, new_size):
+        if new_size >= self.size:            
+            self.size *= 2
+            while len(self.data) < self.size:
+                self.data.append(self.cls())
+
+        elif (self.size / 4) >= new_size \
+                and (self.size / 2) >= self.initial_size:
+            self.size /= 2
+            while len(self.data) > self.size:
+                self.data.pop().destroy()
+
 class LabelButton(tk.Label):
 
     def __init__(self, parent, text, command=lambda *args:None, **kwargs):
@@ -18,21 +38,27 @@ class LabelButton(tk.Label):
         self.configure(bd=2, relief=tk.RAISED)
         self.bind("<Button-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
-
+        
     def activate(self):
+        self["fg"] = "black"
+        self["relief"] = tk.RAISED
         self.bind("<Button-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
-
+        
     def deactivate(self):
+        self["fg"] = "grey26"
+        self["relief"] = tk.GROOVE
         self.unbind("<Button-1>")
         self.unbind("<ButtonRelease-1>")
 
     def on_click(self, *args):
-        self.configure(relief=tk.SUNKEN)
+        self.configure(relief=tk.SUNKEN, fg="black")
     
     def on_release(self, *args):
-        self.configure(relief=tk.RAISED)
+        self.configure(relief=tk.RAISED, fg="black")
         self.command()
+    
+
 
 class ToggleSwitch(LabelButton):
 

@@ -76,8 +76,8 @@ class Server(GlobalState, ConnectionMixin):
         self.ticket_no = 1
         self.connected_clients = dict()
         self.completed = list()
-
         self.coroutine = self.coroutine_switch()
+        
         
     async def server_handler(self, ws, *args, **kwargs):
         async for message in ws:
@@ -88,11 +88,10 @@ class Server(GlobalState, ConnectionMixin):
 
             if request == "connect":
                 self.clients[client_id] = await self.on_connect(ws, client_id, self.update_handler)
-                
- 
+
             elif request == "disconnect":
                 await self.on_disconnect(ws, client_id)
-    
+
             else:
                 await self.coroutine(ws, client_id, request, data)
     
@@ -100,7 +99,6 @@ class Server(GlobalState, ConnectionMixin):
         async for message in ws:
             if message == "update":
                 await ws.send(self.dumps())
-
             elif message == "disconnect":
                 return
 

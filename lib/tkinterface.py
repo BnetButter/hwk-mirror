@@ -3,7 +3,8 @@ from functools import partial
 from operator import itemgetter
 from .data import GUI_STDERR
 from .data import GUI_STDOUT
-from .data import log_info
+from .data import output_message
+from .stream import stdout, stderr
 import asyncio
 import tkinter as tk
 import logging
@@ -30,11 +31,14 @@ class AsyncInterface:
     def __init__(self, delegate):
         self.delegate = delegate
 
+
     def forward(self, request, *args, **kwargs):
         if hasattr(self.delegate, request):
-            function = object.__getattribute__(self.delegate, request)
-            assert callable(function) and not asyncio.iscoroutine(function)
-            function(*args, **kwargs)
+            attribute = object.__getattribute__(self.delegate, request)
+            if not callable(attribute):
+                return attribute
+            assert not asyncio.iscoroutine(attribute)
+            return attribute(*args, **kwargs)
         else:
             raise NotImplementedError
     
@@ -66,6 +70,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=singleton):
             refreshrate = 60
         self.interval = 1 / refreshrate
         self.bind("<Escape>", self.destroy)
+        self.running = False
     
     def update(self):
         for update_task in self.update_tasks:
@@ -79,22 +84,37 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=singleton):
     def add_task(self, task):
         self.tasks.append(self.loop.create_task(task))
 
-    @log_info("System Initiated", time=True)
     def mainloop(self):
+
         async def _mainloop():
-            while True:
+            self.running = True
+            while self.running:
                 self.update()
                 await asyncio.sleep(self.interval)
-    
-        self.tasks.append(self.loop.create_task(_mainloop()))
+            else:
+                self.forward("disconnect")
+                await asyncio.sleep(self.interval * 2)
+                for task in self.tasks:
+                    task.cancel()
+                self.loop.stop()
+        
+        logger = logging.getLogger(f"main.{self.delegate.client_id}.gui")
+        stdout_stream = logging.StreamHandler(stream=stdout)
+        stdout_stream.addFilter(logging.Filter(f"{logger.name}.stdout"))
+        stderr_stream = logging.StreamHandler(stream=stderr)
+        stderr_stream.addFilter(logging.Filter(f"{logger.name}.stderr"))
+        
+        logger.addHandler(stdout_stream)
+        logger.addHandler(stderr_stream)
+        self.loop.create_task(_mainloop())
+
+        logging.getLogger(f"{logger.name}.stdout").info("System Initiated")
         self.loop.run_forever()
     
     def destroy(self, *args):
-        for task in self.tasks:
-            task.cancel()
         super().destroy()
-        self.loop.stop()
-    
+        self.running = False
+        
     def __call__(self):
         self.mainloop()
       

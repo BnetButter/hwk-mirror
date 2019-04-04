@@ -18,8 +18,8 @@ import logging
 logger = logging.getLogger(GUI_STDOUT)
 
 class MenuItem(tuple):
-    def __new__(self, category, name, price, options):
-        return super().__new__(self, (category, name, price, options))
+    def __new__(cls, category, name, price, options):
+        return super().__new__(cls, (category, name, price, options))
     
     def __eq__(self, other):
         return self[0] == other[0] \
@@ -33,7 +33,30 @@ class MenuItem(tuple):
     price = property(itemgetter(2))
     options = property(itemgetter(3))
 
-class Ticket(MenuItem):
+class TicketType(ABCMeta):
+
+    def __init__(self, name, bases, attr):
+        self.category = property(itemgetter(0), self.setter(0))
+        self.name = property(itemgetter(1), self.setter(1))
+        self.price = property(itemgetter(2), self.setter(2))
+        self.options = property(itemgetter(3), self.setter(3))
+        self.selected_options = property(itemgetter(4), self.set_selected_options)
+        self.parameters = property(itemgetter(5), self.setter(5))
+        
+    @staticmethod
+    def setter(index):
+        def _setter(self, value):
+            self[index] = value
+        return _setter
+
+    @staticmethod
+    def set_selected_options(self, iterable):
+            self.selected_options.clear()
+            self.selected_options.extend(iterable)
+    
+
+
+class Ticket(MenuItem, metaclass=TicketType):
 
     def __new__(cls, menu_item, selected_options=None, parameters={}):
         
@@ -83,7 +106,31 @@ class MenuType(type):
         self.no_addons = self.config["No Addons"]
         self.register = self.config["Register"]
         self.payment_types = self.config["Payment Types"]
+    
+    def category(self, category, cls=MenuItem):
+        """return a list of menu items"""
+        if not category:
+            return []
 
+        
+        return [
+            cls(category, item,
+                    self.menu[category][item]["Price"],
+                    self.menu[category][item]["Options"])
+                for item in self.menu[category]
+            ]
+
+    @staticmethod
+    def get_item(category, name):
+        price = MenuType.menu_items[category][name]["Price"]
+        options = MenuType.menu_items[category][name]["Options"]
+        return MenuItem(category, name, price, options)
+
+    @staticmethod
+    def null_item(self, cls=MenuItem):
+        return cls("", "", 0, {})
+    
+    # volatile attributes
     @property
     def all_item_names(self):
         items = [self.menu[category].keys() for category in self.menu]
@@ -115,19 +162,6 @@ class MenuType(type):
     def taxrate(self):
         return Decimal(self.config["Tax"]).quantize(Decimal('.01'))
     
-    
-    def category(self, category, cls=MenuItem):
-        """return a list of menu items"""
-        return [
-            cls(category, item,
-                    self.menu[category][item]["Price"],
-                    self.menu[category][item]["Options"])
-                for item in self.menu[category]
-            ]
-
-    @staticmethod
-    def null_item(self, cls=MenuItem):
-        return cls("", "", 0, {})
 
 class WidgetType(type):
     """Instance a class with font configuration data"""
@@ -138,7 +172,7 @@ class WidgetType(type):
             raise Exception(f"Missing configurations for '{device}'")
 
         # default fonts for class
-        fonts = [key for key in attr if "font" in key]
+        fonts = [key for key in attr if "font" in key or "config" in key]
         
         # instance must specify some font variable
         if name not in config[device].keys() and not fonts:
@@ -157,37 +191,27 @@ class WidgetType(type):
 # OrderInterface creates a singleton class accessed by calling lib.Order()
 # calling lib.NewOrder() replaces the instance with a new list
 
-class OrderInterface(MenuType, UserList):
+class OrderInterface(MenuType, UserList, TicketType):
     instance = None
 
     def __new__(cls, name, bases, attr):
-        attr["orders"] = list()
+        attr["data"] = list()
         cls.instance = super().__new__(cls, name, bases, attr)
         return cls.instance
 
     def __str__(self):
         lines = list()
-        for ticket in self.orders:
+        for ticket in self.data:
             lines.append(str(ticket))
         return "\n".join(lines)
-
-    def complete(self):
-        pass
 
     def remove(self, item):
         super().remove(item)
         logger.info(f"Removed ticket: {item.name, item.addon1.name, item.addon2.name}")
-    
-    def to_dict(self):
-        pass
-
-    @property
-    def data(self):
-        return self.orders
-    
+        
     @property
     def total(self)->int:
-        return sum(ticket.total for ticket in self.orders)
+        return sum(ticket.total for ticket in self.data)
     
     @property
     def subtotal(self)->int:
@@ -202,27 +226,7 @@ class OrderInterface(MenuType, UserList):
     def tax(self)->int:
         return self.total - self.subtotal
 
-
-class ServerInterface(ABCMeta, type):
-
-    instance = None
-    def __new__(cls, name, bases, attr):
-        if cls.instance is None:
-            cls.instance = super().__new__(cls, name, bases, attr)
-        return cls.instance
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.loop = asyncio.get_event_loop()
-        self.serve = partial(self._serve, ip=CONFIGDATA["ip"], port=CONFIGDATA["port"])
-
-    def _serve(self, handler, ip=None, port=None):
-        return websockets.serve(handler, ip, port)
-
-
 # resolve metaclas conflict
 class MenuWidget(WidgetType, MenuType):
     pass
 
-class TicketType(MenuType, ABCMeta):
-    pass

@@ -1,4 +1,4 @@
-from lib import abstract_pos_client
+from lib import POSInterface
 import logging
 import sys
 
@@ -7,7 +7,7 @@ stream_handler = logging.StreamHandler(stream=sys.stderr)
 stream_handler.setFormatter(logging.Formatter("%(levelname)s - %(funcName)s - %(message)s"))
 logger.addHandler(stream_handler)
 
-class POSProtocolBase(abstract_pos_client):
+class POSProtocolBase:
 
     def __init__(self):
         logger.warning(f"{type(self).__name__} delegate does not implement any methods")
@@ -17,10 +17,6 @@ class POSProtocolBase(abstract_pos_client):
         raise NotImplementedError
 
     def global_shutdown(self, *args, **kwargs):
-        logger.warning("NotImplemented")
-        raise NotImplementedError
-    
-    def ping_respond(self, *args, **kwargs):
         logger.warning("NotImplemented")
         raise NotImplementedError
     
@@ -47,3 +43,4 @@ class POSProtocolBase(abstract_pos_client):
     def get_order_status(self, *args, **kwargs):
         logger.warning("NotImplemented")
         raise NotImplementedError
+

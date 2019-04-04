@@ -44,6 +44,16 @@ def gettime():
     ct_local = localtime()
     return strftime("%m/%d/%y %I:%M:%S %p", ct_local)
 
+def alert(message, time=False):
+    if time:
+        message = f"{gettime()} - ALERT - {message}"
+    else:
+        message = "ALERT - " + message
+    logging.getLogger(GUI_STDOUT).info(message)
+
+def output_message(message):
+    return gettime() + " - " + message
+
 def log_debug(message, name=SYS_STDOUT, time=False):
     logger=logging.getLogger(name)
     

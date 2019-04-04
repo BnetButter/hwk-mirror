@@ -12,7 +12,7 @@ from .network_status import NetworkStatus
 from logging import getLogger
 from .shutdown_button import *
 from .titlebar import titlebar
-
+from .progress_tab import ProgressFrame
 from .order import Order, NewOrder
 
 class MenuDisplay(TabbedFrame, metaclass=MenuWidget, device="POS"):
@@ -30,7 +30,6 @@ class MenuDisplay(TabbedFrame, metaclass=MenuWidget, device="POS"):
         for category in MenuDisplay.categories:
             self[category] = CategoryFrame(self, category)
 
-        
         MenuDisplay.__instance = self
 
     @classmethod
@@ -53,6 +52,14 @@ class OrderDisplay(TabbedFrame, metaclass=MenuWidget, device="POS"):
             font=self.tabfont,
             padding=5)
         self._notebook.configure(style="OrderDisplay.TNotebook")
-        self["Orders    "] = OrdersFrame(self)
-        self["Checkout  "] = CheckoutFrame(self)
-        self["Processing"] = ScrollFrame(self)
+        order_frame = OrdersFrame(self)
+        checkout_frame = CheckoutFrame(self)
+        progress_frame = ProgressFrame(self)
+    
+        self["Orders    "] = order_frame
+        self["Checkout  "] = checkout_frame
+        self["Processing"] = progress_frame
+
+        order_frame.update_order_list()
+        checkout_frame.update_order_list()
+        progress_frame.update_order_status()

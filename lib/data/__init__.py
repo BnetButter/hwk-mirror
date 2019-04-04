@@ -23,6 +23,27 @@ except:
 
 
 router_ip = CONFIGDATA["router"]
-device_ip = CONFIGDATA["ip"]
-port = CONFIGDATA["port"]
+device_ip = CONFIGDATA["ip"] # ip address of the RPI running the server process
+port = CONFIGDATA["port"] # port of the primary server handler
+DEBUG = CONFIGDATA["__debug"]
 address = f"ws://{device_ip}:{port}"
+
+
+class _TicketStatus(int):
+    
+    def __new__(cls, number):
+        return super().__new__(cls, number)
+
+    def __str__(self):
+        if self == -1:
+            return "Queued"
+        elif self == 0:
+            return "Processing"
+        elif self == 1:
+            return "Complete"
+    
+    
+
+TICKET_QUEUED = _TicketStatus(-1)
+TICKET_WORKING = _TicketStatus(0)
+TICKET_COMPLETE = _TicketStatus(1)

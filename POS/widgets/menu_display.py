@@ -113,6 +113,7 @@ class AddonOptions(tk.Toplevel, metaclass=WidgetType, device="POS"):
         close = tk.Button(self, text="Close", bg="red", command=self.destroy)
         close.pack(pady=10, padx=5, side=tk.LEFT)
         done.pack(pady=10, padx=5, side=tk.LEFT)
+    
     def label(self, name):
         return tk.Label(self,
                 text=f"Select options for {name}", 

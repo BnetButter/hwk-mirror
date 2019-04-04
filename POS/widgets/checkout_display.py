@@ -120,14 +120,13 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
         change_due_frame = self.labeled_entry("Change Due ", self.change_due)
         cash_given_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
         change_due_frame.grid(row=1, column=0, columnspan=2, sticky="nswe")
-        self._update()
-
+    
     @property
     def cash(self):
         try:
             result = self.cash_given.get().strip()
             result = decimal.Decimal(result).quantize(decimal.Decimal('.01'))
-            return result * 100
+            return int(result * 100)
         except:
             return 0
     
@@ -136,7 +135,7 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
         try:
             result = self.change_due.get().strip()
             result = decimal.Decimal(result).quantize(decimal.Decimal('.01'))
-            return result * 100
+            return int(result * 100)
         except:
             return 0
     
@@ -156,7 +155,7 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
         return frame
 
     @update
-    def _update(self):
+    def update(self):
         change = Order().total - self.cash
         if change > 0 or Order().total == 0:
             self.change_due.set("- - -")
@@ -265,6 +264,8 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
                 sticky="nswe",
                 pady=10,
                 padx=10)
+
+        calculator.update()
     
         self.buttons = [
                 LabelButton(self.interior, payment_type, font=self.font) 

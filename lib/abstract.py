@@ -7,29 +7,22 @@ import sys
 logger = logging.getLogger(SYS_STDERR)
 
 class abstract_server(metaclass=ABCMeta):
-    
+        
     @abstractmethod
-    def ping_client(self):
-        ...
-    
-    @abstractmethod
-    def send_global_shutdown(self):
+    def global_shutdown(self):
         ...
     
     @abstractmethod
     def send_time(self):
         ...
 
-    
     @abstractmethod
     def send_menu(self):
         ...
 
-    
     @abstractmethod
     def send_ticket_no(self):
         ...
-
     
     @abstractmethod
     def respond_new_order(self):
@@ -62,11 +55,6 @@ class abstract_client(metaclass=ABCMeta):
     
     @abstractmethod
     def global_shutdown(self):
-        ...
-
-        
-    @abstractmethod
-    def ping_respond(self):
         ...
 
     @abstractmethod

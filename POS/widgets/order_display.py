@@ -201,7 +201,7 @@ class OrdersFrame(ScrollFrame):
         null_frame = TicketFrame(self.interior)
         null_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
         null_frame.lower()
-        self.update_order_list()
+        
     
     @update
     def update_order_list(self):

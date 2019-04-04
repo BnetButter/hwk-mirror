@@ -52,10 +52,11 @@ class PriceDisplay(tk.Frame):
                     padx=5,
                     columnspan=2)
         
-        self.update_price("$ {:.2f}")
+        self.update()
 
     @update
-    def update_price(self, fmt):
+    def update(self):
+        fmt = "$ {:.2f}"
         self.subtotal_var.set(fmt.format(Order().subtotal / 100))
         self.tax_var.set(fmt.format(Order().tax / 100))
         self.total_var.set(fmt.format(Order().total / 100))
