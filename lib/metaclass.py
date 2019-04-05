@@ -201,7 +201,6 @@ class OrderInterface(MenuType, UserList, TicketType):
 
     def remove(self, item):
         super().remove(item)
-        logger.info(f"Removed ticket: {item.name, item.addon1.name, item.addon2.name}")
         
     @property
     def total(self)->int:
