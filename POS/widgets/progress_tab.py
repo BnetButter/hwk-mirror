@@ -24,8 +24,12 @@ import asyncio
 import decimal
 import logging
 
+def alert(message):
+    logging.getLogger("main.POS.gui.stdout").info(f"ALERT - {message}")
+
 # essentially the same as lib.Ticket
 class MutableTicket(UserList, metaclass=TicketType):
+    
     def __init__(self, ticket):
         self.data = list(ticket[:6])
 
@@ -43,15 +47,299 @@ class MutableTicket(UserList, metaclass=TicketType):
         self.data.append(addon2)
         return self
         
+
+class ItemEditorType(MenuWidget):
+
+    null_item = MutableTicket(("", "", 0, {}, [], {}))
+
+    def item_names(self, category):
+        try:
+            return list(self.menu_items[category].keys())
+        except KeyError:
+            return list()
+    
+    def item_lookup(self, category, name):
+        item = self.menu_items[category][name]
+        return item["Price"], item["Options"]
+
+    def __call__(self, parent, **kwargs):
+        result = (super().__call__(parent, **kwargs),
+                super().__call__(parent, **kwargs),
+                super().__call__(parent, **kwargs))
+        return result
+
+
+class ItemEditor(metaclass=ItemEditorType, device="POS"):
+    font = ("Courier", 14)
+    style = None
+
+    def __new__(cls, parent, **kwargs):
+        if cls.style is None:
+            cls.style = ttk.Style(parent)
+            cls.style.configure("ItemEditor.TCombobox", 
+                    font=cls.font)
+            cls.style.map("ItemEditor.TCombobox",
+                    fieldbackground=[("readonly", "white")],
+                    selectbackground=[("readonly", "white")],
+                    selectforeground=[("readonly","black")])
+        return super().__new__(cls)
+        
+    def __init__(self, parent, **kwargs):
+        self.removed = True
+        self._ticket = None
+        self.category = None
+        self.item_selector = ttk.Combobox(parent,
+                state="readonly",
+                style="ItemEditor.TCombobox",
+                font=self.font,
+                width=type(self).longest_item,
+                postcommand=self.send_alert)
+        
+        self.edit_options = LabelButton(parent, "Options",
+                width=7,
+                font=self.font,
+                command=self._options_callback(parent))
+        
+        self.remove_item = LabelButton(parent, "Remove",
+                width=7,
+                font=self.font,
+                bg="red",
+                command=self._remove_callback)
+
+        self.add_item = LabelButton(parent, "",
+                width=7,
+                font=self.font,
+                command=self._add_callback)
+
+    def grid(self, row=None, column=None, isaddon=True):
+        if isaddon:
+            self.item_selector.grid(row=row, column=column +1, sticky="nswe", padx=2, pady=1)
+            self.add_item.grid(row=row, column=column +1, sticky="nswe", padx=2, pady=1)
+        else:
+            self.item_selector.grid(row=row, column=column, columnspan=2, sticky="nswe", padx=2, pady=1)
+            self.add_item.grid(row=row, column=column, columnspan=2, sticky="nswe", padx=2, pady=1)
+        self.edit_options.grid(row=row, column=column +3, sticky="nswe", padx=2, pady=1)
+        self.remove_item.grid(row=row, column=column +4, sticky="nswe", padx=2, pady=1)
+
+    def send_alert(self):
+        if self.ticket.parameters.get("register", False):
+            alert(f"'{self.ticket.name}' may have been completed")
+
+    @property
+    def ticket(self):
+        return self._ticket
+    
+    @ticket.setter
+    def ticket(self, value):
+        self.category = value.category
+        self.item_selector["values"] = type(self).item_names(value.category)
+        self.item_selector.set(value.name)
+        self.add_item["text"] = value.category
+        
+        if value.name:
+            self._add_callback()
+        else:
+            self._remove_callback()
+        self._ticket = value
+
+    def get(self):
+        if self.removed or self.ticket is None:
+            return type(self).null_item
+        
+        item_name = self.item_selector.get()
+        if item_name:
+            self.ticket.name = item_name
+            self.ticket.price, self.ticket.options = \
+                     type(self).item_lookup(self._ticket.category, item_name)
+        else:
+            self.ticket.price = 0
+            self.ticket.selected_options.clear()
+            self.ticket.parameters.clear()
+        return self.ticket
+
+    def _remove_callback(self, *args):
+        self.removed = True
+        if self.ticket is not None:
+            self.send_alert()
+        self.item_selector.lower()
+        self.edit_options.grid_remove()
+        self.remove_item.grid_remove()
+        self.add_item.lift()
+    
+    def _add_callback(self, *args):
+        self.removed = False
+        self.item_selector.lift()
+        self.edit_options.grid()
+        self.remove_item.grid()
+        self.add_item.lower()
+
+    def _options_callback(self, parent):
+        def inner(*args):
+            EditOptions(parent, self.get())
+        return inner
+    
+    def destroy(self, *args):
+        self.item_selector.destroy()
+        self.edit_options.destroy()
+        self.remove_item.destroy()
+        self.add_item.destroy()
+    
+
+class TicketEditor(tk.Frame):
+    
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.grid_columnconfigure(1, weight=1)
+        ttk.Separator(self).grid(row=0, column=0, columnspan=5, sticky="nswe", padx=2, pady=5)
+        self.item_editors = item, addon1, addon2 = ItemEditor(self)
+        
+        # prevent frame from 
+        tk.Label(self, width=2, font=ItemEditor.font).grid(row=2, column=0, sticky="nswe", padx=2)
+        item.grid(row=1, column=0, isaddon=False)
+        addon1.grid(row=2, column=0)
+        addon2.grid(row=3, column=0)
+        self.isgridded = True
+    
+    def total(self):    
+        return sum(item.get().total for item in self.item_editors)
+    
+    def grid(self, **kwargs):
+        super().grid(**kwargs)
+        self.isgridded = True
+    
+    def grid_remove(self):
+        super().grid_remove()
+        self.isgridded = False
+
+    @property
+    def removed(self):
+        return all(item.removed for item in self.item_editors)
+
+    def set(self, *items):
+        for i, editor in enumerate(self.item_editors):
+            editor.ticket = items[i]
+            
+    def get(self):
+        ticket = MutableTicket(self.item_editors[0].get())
+        ticket.data.extend((self.item_editors[1].get(), self.item_editors[2].get()))
+        return ticket
+
+
+class EditorCalculator(ChangeCalculator, device="POS"):
+    font = ("Courier", 14)
+
+    def update(self, difference):
+        change = difference - self.cash
+        if change > 0 or difference == 0:
+            self.change_due.set("- - -")
+        else:
+            self.change_due.set("{:.2f}".format(change / 100))
+
+
+class TicketEditorFrame(tk.Frame):
+            
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs) 
+        self.widgets = WidgetCache(TicketEditor, self, initial_size=4)
+        
+        tk.Label(self, width=3, font=ItemEditor.font).grid(row=0, column=0, sticky="nswe", padx=2, ipadx=2)
+        self.calculator_frame = tk.Frame(self, bd=2, relief=tk.RIDGE)
+        self.calculator = EditorCalculator(self.calculator_frame)
+        self._difference = tk.StringVar(self)
+
+        self.difference_label = tk.Label(self.calculator_frame, text="Difference ", font=ItemEditor.font)
+        self.difference_entry = tk.Entry(self.calculator_frame, 
+                textvariable=self._difference,
+                font=ItemEditor.font,
+                state=tk.DISABLED,
+                disabledforeground="black",
+                disabledbackground="white",
+                width=10)
+        
+        self.difference_label.grid(row=0, column=0, sticky="w")
+        self.difference_entry.grid(row=0, column=1, sticky="w")
+        self.calculator.grid(row=1, column=0, sticky="w", columnspan=2)
+
+        self.calculator_frame.grid(row=0, column=1, sticky="nswe", columnspan=2, pady=2, padx=2)
+        self.ticket_no = None
+        self.is_gridded = False
+        self.original_total = None
+
+    @property
+    def difference(self):
+        try:
+            result = self._difference.get()
+            result = decimal.Decimal(result).quantize(decimal.Decimal(".01"))
+            return int(result * 100)
+        except:
+            return 0
+
+    @difference.setter
+    def difference(self, value):
+        self._difference.set("{:.2f}".format(value / 100))
+
+    def set(self, ticket_no, index):
+        self.ticket_no = int(ticket_no)
+        self.original_total, order_list = AsyncTk().forward(
+                "get_order_info", self.ticket_no, "total", "items")
+        self.widgets.realloc(len(order_list))
+
+        for i, ticket in enumerate(order_list):
+            item, addon1, addon2 = (MutableTicket(ticket),
+                    MutableTicket(ticket[6]),
+                    MutableTicket(ticket[7]))
+
+            # combobox needs to know what items to show by looking up
+            # the item's category
+            self.widgets[i].set(*self.set_category(item, addon1, addon2))
+            self.widgets[i].grid(row=i + 1, column=1, columnspan=4, sticky="nswe")
+    
+        # remove excess cached widgets
+        for ticket in self.widgets[len(order_list):len(self.widgets)]: 
+            ticket.grid_remove()
+        
+        self.grid(row=index, column=0, columnspan=5, sticky="nswe", pady=2)
+
+    @staticmethod
+    def set_category(item, addon1, addon2):
+        sides = "Sides"
+        drinks = "Drinks"
+        if item.category in ItemEditor.two_sides:
+            addon1.category = sides
+            addon2.category = sides
+        elif item.category in ItemEditor.no_addons:
+            addon1.category = ""
+            addon2.category = ""
+        else:
+            addon1.category = sides
+            addon2.category = drinks
+        return item, addon1, addon2
+    
+    def grid(self, **kwargs):
+        self.is_gridded = True
+        super().grid(**kwargs)
+
+    def grid_remove(self):
+        self.is_gridded = False
+        super().grid_remove()
+
+    def create_order(self):
+        return [widget.get() for widget in self.widgets if not widget.removed]
+      
+    @update
+    def update(self):
+        if not self.is_gridded:
+            return
+        self.difference = sum(widget.total() for widget in self.widgets) - self.original_total
+        self.calculator.update(self.difference)
+
+
 class ConfirmationFrame(tk.Frame):
     
     def __init__(self, parent, first="Confirm", font=None, **kwargs):
-        assert first == "Confirm" or first == "Return"
         super().__init__(parent, **kwargs)
-
         self.confirm_bt = LabelButton(self, "Confirm", width=7, font=font, bg="green")
         self.return_bt = LabelButton(self, "Return", width=7, font=font)
-        
         confirm_grid_info = {"row":0, "column":1,  "sticky":"nswe", "padx":2}
         return_grid_info = {"row":0, "column": 1,  "sticky":"nswe", "padx":2}
 
@@ -68,8 +356,7 @@ class ConfirmationFrame(tk.Frame):
         
     def set_return(self, command):
         self.return_bt.command = command
-    
-# ttk has a Progressbar widget but can't easily control its height and width
+
 class ProgressBar(tk.Frame):
 
     def __init__(self, parent, **kwargs):
@@ -88,422 +375,7 @@ class ProgressBar(tk.Frame):
 
     @status.setter
     def status(self, value):
-        assert value <= 100 and value >=0
         self._status.set(value)
-
-class CheckButton(tk.Checkbutton):
-
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self._complete = tk.IntVar(self)
-        self["variable"] = self._complete
-    
-    def command(self, ticket):
-        def _cmd(*args):
-            ticket.parameters["status"] = self.complete == TICKET_COMPLETE
-        self["command"] = _cmd
-
-        
-    def update(self, ticket):
-        if ticket.name:
-            self.complete = ticket.parameters.get("status") == TICKET_COMPLETE
-        else:
-            self.complete = 0
-        
-        if self.complete:
-            self["state"] = tk.DISABLED
-        else:
-            self["state"] = tk.NORMAL
-        
-
-    
-
-    @property
-    def complete(self):
-        return self._complete.get()
-
-    @complete.setter
-    def complete(self, value):
-        self._complete.set(int(value))
-
-class ComboBox(ttk.Combobox, metaclass=MenuType):
-    
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, state="readonly", **kwargs)
-        self._ticket = None
-        self.removed = False
-        self.category = None
-        self["postcommand"] = self.postcommand
-
-    def postcommand(self, *args):
-        if self._ticket.parameters.get("status") == TICKET_COMPLETE:
-            self["values"] = []
-            logging.getLogger("main.POS.gui.stdout").info(f"'{self._ticket.name}' cannot be changed.")
-
-    
-    def grid(self, **kwargs):
-        super().grid(**kwargs)
-        self.removed = False
-    
-    def grid_remove(self):
-        super().grid_remove()
-        self.removed = True
-    
-    @property
-    def ticket(self):
-        return self._ticket
-    
-    @ticket.setter
-    def ticket(self, value):
-        self._ticket = value
-        self.set(value.name)
-        self.category = value.category
-        self["values"] = [
-            item.name for item in ComboBox.category(value.category)
-        ]
-
-    def get(self):
-        name = super().get()
-        if not name or self.removed:
-            self._ticket.name = ""
-            self._ticket.price = 0
-            self._ticket.options = {}
-            return self._ticket
-        
-        menu_item = ComboBox.get_item(self.category, name)
-        self._ticket.name = menu_item.name
-        self._ticket.price = menu_item.price
-        self._ticket.options = menu_item.options
-        return self._ticket
-
-    # for AsyncTk().update
-    def total(self):
-        price = 0
-        name = super().get()
-        if not name or self.removed:
-            return price
-
-        menu_item = ComboBox.get_item(self.category, name)
-        price += menu_item.price
-
-        for item in self._ticket.selected_options:
-            if item in self._ticket.options:
-                price += self._ticket.options[item]
-        return price
-
-
-class TicketEditor(tk.Frame, metaclass=MenuWidget, device="POS"):
-    font = ("Courier", 14)
-    style = None
-
-    def __new__(cls, parent, **kwargs):
-        if cls.style is None:
-            cls.style = ttk.Style(parent)
-            cls.style.configure("TicketEditor.TCombobox", 
-                    font=cls.font,
-                    width=cls.longest_item)
-            cls.style.map("TicketEditor.TCombobox",
-                    fieldbackground=[("readonly", "white")],
-                    selectbackground=[("readonly", "white")],
-                    selectforeground=[("readonly","black")])
-    
-        return super().__new__(cls)
-
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        
-        self.item_box = ComboBox(self, width=ComboBox.longest_item)
-        self.addon1_box = ComboBox(self, width=ComboBox.longest_addon)
-        self.addon2_box = ComboBox(self, width=ComboBox.longest_addon)
-        self.item_box["style"] = "TicketEditor.TCombobox"
-        self.addon1_box["style"] = "TicketEditor.TCombobox"
-        self.addon2_box["style"] = "TicketEditor.TCombobox"
-
-        self.item_box.configure(font=self.font)
-        self.addon1_box.configure(font=self.font)
-        self.addon2_box.configure(font=self.font)
-        
-        spacer0 = tk.Label(self, text="", width=3, font=self.font)
-        spacer1 = tk.Label(self, text="", width=8, font=self.font)
-
-        spacer3 = tk.Label(self, text="", width=7, font=self.font)
-        spacer4 = tk.Label(self, text="", width=7, font=self.font)
-        spacer3.grid(row=1, column=3, sticky="nswe", pady=2, padx=2)
-        spacer4.grid(row=1, column=4, sticky="nswe", pady=2, padx=2)
-
-
-        self.remove = [LabelButton(self, "Remove", font=self.font, width=7, bg="red") for i in range(3)]
-        self.options = [LabelButton(self, "Options", font=self.font, width=7) for i in range(3)]
-        self.add_addon = [LabelButton(self, "", font=self.font) for i in range(3)]
-        self.mark_complete = [CheckButton(self) for i in range(3)]
-
-        ttk.Separator(self).grid(row=0, column=1, columnspan=4, sticky="we", pady=2)
-
-        spacer0.grid(row=1, column=0, sticky="nswe")
-        spacer1.grid(row=2, column=0, columnspan=2, sticky="nswe")
-
-        self.item_box.grid(row=1, column=1, columnspan=2, sticky="w", pady=2)
-        self.addon1_box.grid(row=2, column=2, sticky="nswe", pady=2)
-        self.addon2_box.grid(row=3, column=2, sticky="nswe", pady=2)
-
-        for i, checkbutton in enumerate(self.mark_complete):
-            checkbutton.grid(row=i + 1, column=0, sticky="nswe", padx=2, pady=2)
-
-        for i, option_bt in enumerate(self.options):
-            option_bt.grid(row=i + 1, column=3, sticky="nswe", padx=2, pady=2)
-            
-        for i, remove_bt in enumerate(self.remove):
-            remove_bt.grid(row=i + 1, column=4, sticky="nswe", padx=2, pady=2)
-        
-        for i, add_addon in enumerate(self.add_addon[1:]):
-            add_addon.grid(row=i + 2, column=2, sticky="nswe", padx=2, pady=2)
-            add_addon.grid_remove()
-        
-        self.add_addon[0].grid(row=1,
-                column=1,
-                columnspan=2,
-                sticky="nswe",
-                pady=2,
-                padx=2)
-    
-        self.add_addon[0].grid_remove()
-        self.removed = True
-
-    def get_total(self):
-        if self.item_box.category in self.two_sides:
-            addon1_total = 0
-            addon2_total = 0
-        else:
-            addon1_total = self.addon1_box.total()
-            addon2_total = self.addon2_box.total()
-        
-        return (self.item_box.total()
-                + addon1_total
-                + addon2_total)
-
-    def grid(self, **kwargs):
-        super().grid(**kwargs)
-        self.removed = False    
-
-    def grid_remove(self):
-        super().grid_remove()
-        self.removed = True
-
-    def create_ticket(self):
-        null_ticket = ("", "", 0, {}, [], {})
-        if not self.addon1_box.get().name:
-            addon1 = MutableTicket(null_ticket)
-        else:
-            addon1 = self.addon1_box.ticket
-
-        if not self.addon2_box.get().name:
-            addon2 = MutableTicket(null_ticket)
-        else:
-            addon2 = self.addon2_box.ticket
-    
-        return self.item_box.get().create_ticket(addon1, addon2)
-
-    def _update(self, item, addon1, addon2):
-
-        self.item_box.ticket = item
-        self.addon1_box.ticket = addon1
-        self.addon2_box.ticket = addon2
-
-
-        comboboxes = (self.item_box, self.addon1_box, self.addon2_box)
-        
-        for i, combobox in enumerate(comboboxes):
-            self.mark_complete[i].command(combobox.ticket)
-            self.mark_complete[i].update(combobox.ticket)
-            add_item =  functools.partial(self.on_addon_add,
-                    combobox,
-                    self.options[i],
-                    self.remove[i],
-                    self.add_addon[i],
-                    self.mark_complete[i])
-        
-            remove_item = functools.partial(self.on_addon_remove, 
-                    combobox,
-                    self.options[i],
-                    self.remove[i],
-                    self.add_addon[i],
-                    self.mark_complete[i])
-
-            self.options[i].command = functools.partial(self.edit_options, 
-                    combobox)
-
-            self.add_addon[i].command = add_item
-            self.remove[i].command = remove_item
-            
-            if combobox.ticket.name:
-                add_item()
-            else:
-                remove_item()
-            
-
-    def edit_options(self, combobox):
-        EditOptions(self, combobox.get())
-    
-    @staticmethod
-    def on_addon_remove(combobox, option_button, remove_button, addon_add, checkbutton):
-        status = combobox.ticket.parameters.get("status") == TICKET_COMPLETE
-        if status:
-            return logging.getLogger("main.POS.gui.stdout").info(
-                        f"Cannot remove '{combobox._ticket.name}'")
-
-        combobox.grid_remove()
-        option_button.grid_remove()
-        remove_button.grid_remove()
-        checkbutton.grid_remove()
-        addon_add["text"] = combobox.category
-        addon_add.grid()
-    
-    @staticmethod
-    def on_addon_add(combobox, option_button, remove_button, addon_add, checkbutton):
-        combobox.grid()
-        option_button.grid()
-        remove_button.grid()
-        
-        if combobox.ticket.parameters.get("register", False):
-            checkbutton.grid()
-        else:
-            checkbutton.grid_remove()
-                
-        addon_add.grid_remove()
-
-
-class TicketEditorFrame(tk.Frame):
-
-    class EditorCalculator(ChangeCalculator, device="POS"):
-        font = ("Courier", 14)
-        difference = 0
-     
-        def __init__(self, parent, **kwargs):
-            super().__init__(parent, **kwargs)
-            self.difference = 0
-            
-  
-        @update
-        def update(self, difference):
-            change = difference - self.cash
-            if change > 0 or difference == 0:
-                self.change_due.set("- - -")
-            else:
-                self.change_due.set("{:.2f}".format(change / 100))
-            
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs) 
-        self.widgets = WidgetCache(TicketEditor, self, initial_size=4)
-
-        self.calculator_frame = tk.Frame(self, bd=2, relief=tk.RIDGE)
-        self.calculator = self.EditorCalculator(self.calculator_frame)
-        self._difference = tk.StringVar(self)
-
-
-        self.difference_label = tk.Label(self.calculator_frame, text="Difference ", font=TicketEditor.font)
-        self.difference_entry = tk.Entry(self.calculator_frame, 
-                textvariable=self._difference,
-                font=TicketEditor.font,
-                state=tk.DISABLED,
-                disabledforeground="black",
-                disabledbackground="white",
-                width=10)
-        
-        self.difference_label.grid(row=0, column=0, sticky="w")
-        self.difference_entry.grid(row=0, column=1, sticky="w")
-        self.calculator.grid(row=1, column=0, sticky="w", columnspan=2)
-
-
-        self.calculator_frame.grid(row=0, column=1, sticky="nswe", pady=2, ipadx=2)
-        self.ticket_no = None
-        self.is_gridded = False
-        self.original = None
-        self.original_total = None
-        self.calculator.update(self.difference)
-
-    @property
-    def difference(self):
-        try:
-            result = self._difference.get()
-            result = decimal.Decimal(result).quantize(decimal.Decimal(".01"))
-            return int(result * 100)
-        except:
-            return 0
-
-    @difference.setter
-    def difference(self, value):
-        self._difference.set("{:.2f}".format(value / 100))
-        self.calculator.difference = value
-
-    # only called if 'modify' button is presed
-    def _update(self, ticket_no, index):
-        self.original = AsyncTk().forward("order_queue")
-        # so we know whether or not to remove ticket_editor_frame
-         # from grid if order is canceled
-        self.ticket_no = int(ticket_no)
-
-        self.original_total, = AsyncTk().forward(
-                "get_order_info", self.ticket_no, "total")
-
-        order = self.original[ticket_no]["items"]
-        self.widgets.realloc(len(order))
-        
-
-        for i, ticket in enumerate(order):
-            # we want to be able to change the ticket
-            item, addon1, addon2 = (MutableTicket(ticket),
-                    MutableTicket(ticket[6]),
-                    MutableTicket(ticket[7]))
-
-           
-
-            # combobox needs to know what items to display by looking up
-            # the item's category
-            self.set_category(item, addon1, addon2)
-            self.widgets[i].grid(row=i + 1, column=0, columnspan=4, sticky="nswe")
-            self.widgets[i]._update(item, addon1, addon2)
-            
-        # remove excess cached widgets
-        for ticket in self.widgets[len(order):len(self.widgets)]: 
-            ticket.grid_remove()
-
-        self.grid(row=index, column=0, columnspan=4, sticky="nswe", pady=2)
-
-    @staticmethod
-    def set_category(item, addon1, addon2):
-        sides = "Sides"
-        drinks = "Drinks"
-        if item.category in ComboBox.two_sides:
-            addon1.category = sides
-            addon2.category = sides
-        
-        elif item.category in ComboBox.no_addons:
-            addon1.category = ""
-            addon2.category = ""
-
-        else:
-            addon1.category = sides
-            addon2.category = drinks
-    
-    def grid(self, **kwargs):
-        self.is_gridded = True
-        super().grid(**kwargs)
-
-    def grid_remove(self):
-        self.is_gridded = False
-        super().grid_remove()
-
-    def create_order(self):
-        return [widget.create_ticket() for widget in self.widgets if not widget.removed]
-
-    @update
-    def update_difference(self):
-        if self.ticket_no is None \
-                or not self.is_gridded:
-            return
-
-        new_total = sum(widget.get_total() for widget in self.widgets if not widget.removed)
-        self.difference = new_total - self.original_total
 
 class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
     font=("Courier", 14)
@@ -513,16 +385,13 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
     def __new__(cls, parent, **kwargs):
         if cls.editor is None:
             cls.editor = TicketEditorFrame(parent)
-            cls.editor.update_difference()
-    
-        if cls.confirm_modify is None:
+            cls.editor.update()
             cls.confirm_modify = ConfirmationFrame(parent, first="Return", font=cls.font)
-
         return super().__new__(cls)
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
         self.original_order = None
         self.ticket_no = tk.Label(self, font=self.font, relief=tk.SUNKEN, bd=1, bg="white")
         self.index = None
@@ -543,11 +412,10 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
                 columnspan=5,
                 sticky="we",
                 pady=2)
-    
+
         self.ticket_no.grid(row=1, column=0,
                 sticky="nswe",
                 padx=2)
-        
         self.progress.grid(row=1, column=1,
                 sticky="nswe",
                 columnspan=2,
@@ -568,9 +436,7 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.modify_button.lift()
         self.cancel_button.lift()
     
-
-
-    def _update(self, ticket_no, progress):
+    def _update(self, ticket_no):
         ticket_no = int(ticket_no)
         self.ticket_no["text"] = "{:03d}".format(ticket_no)
         self.progress.status = AsyncTk().forward("get_order_status", ticket_no)
@@ -582,6 +448,13 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
             self.modify_button.activate()
 
     def on_cancel(self):
+        items, = AsyncTk().forward("get_order_info", int(self.ticket_no["text"]), "items")
+        names = []
+        for ticket in items:
+            for item in (ticket[:6], ticket[6], ticket[7]):
+                if item[5].get("register", False):
+                    names.append(f"'{item[1]}'")
+        alert(f"{', '.join(names)} may have been completed.")
         self.confirm_cancel.lift()
 
     def on_modify(self, *args):
@@ -590,17 +463,15 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
                 columnspan=2,
                 sticky="nswe",
                 in_=self)
-        self.confirm_modify.lift()
 
-        self.editor._update(str(int(self.ticket_no["text"])), self.index + 1)
+        self.confirm_modify.lift()
+        self.editor.set(str(int(self.ticket_no["text"])), self.index + 1)
     
     def on_cancel_confirm(self):
         self.cancel_button.lift()
         self.modify_button.lift()
-        
         ticket_no = int(self.ticket_no["text"])
         original, = AsyncTk().forward("get_order_info", ticket_no, "items")
-        
         modified_order = []
         for ticket in original:
             items = ticket[:6], ticket[6], ticket[7]        
@@ -619,7 +490,6 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
             return AsyncTk().forward("modify_order", ticket_no, modified_order)
 
         AsyncTk().forward("cancel_order", ticket_no)
-
         if self.editor.ticket_no == ticket_no:
             self.editor.grid_forget()
             self.confirm_modify.grid_forget()
@@ -657,10 +527,9 @@ class ProgressFrame(ScrollFrame):
         queue_size = len(order_queue)
         self.widget_cache.realloc(queue_size)
         cache_size = len(self.widget_cache)
-
         for i, ticket_num in enumerate(order_queue):
-            self.widget_cache[i]._update(ticket_num, 50)
-            self.widget_cache[i].grid(row=(cache_size - i) * 2, column=0, columnspan=4, sticky="we", padx=10)
+            self.widget_cache[i]._update(ticket_num)
+            self.widget_cache[i].grid(row=(cache_size - i) * 2, column=0, columnspan=5, sticky="we", padx=5)
             self.widget_cache[i].index = (cache_size - i) * 2
 
         # remove excess cached widgets
