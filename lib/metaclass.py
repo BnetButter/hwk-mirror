@@ -14,9 +14,6 @@ import asyncio
 import websockets
 import logging
 
-
-logger = logging.getLogger(GUI_STDOUT)
-
 class MenuItem(tuple):
     def __new__(cls, category, name, price, options):
         return super().__new__(cls, (category, name, price, options))
@@ -55,11 +52,9 @@ class TicketType(ABCMeta):
             self.selected_options.extend(iterable)
     
 
-
 class Ticket(MenuItem, metaclass=TicketType):
 
     def __new__(cls, menu_item, selected_options=None, parameters={}):
-        
         if selected_options is None:
             return tuple.__new__(cls, (*menu_item, list(), parameters))
         else:
@@ -112,7 +107,6 @@ class MenuType(type):
         if not category:
             return []
 
-        
         return [
             cls(category, item,
                     self.menu[category][item]["Price"],
