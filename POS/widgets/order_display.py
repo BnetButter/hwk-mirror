@@ -2,17 +2,18 @@ from lib import ScrollFrame
 from lib import TabbedFrame
 from .order import Order
 from lib import Ticket
-from lib import WidgetType, MenuWidget
+from lib import WidgetType, MenuWidget, ToplevelWidget
 from lib import ToggleSwitch
 from lib import AsyncTk, update
 from lib import write_enable
 from functools import partial
 from tkinter import ttk
-
+import lib
 import tkinter as tk
 import asyncio
 import logging
 
+from .cyclicref import print_cycles
 
 
 class OptionLabel(tk.Text, metaclass=MenuWidget, device="POS"):
@@ -36,9 +37,9 @@ class OptionLabel(tk.Text, metaclass=MenuWidget, device="POS"):
         self.insert(tk.END, selected_options)
         self["height"] = len(item.selected_options)
 
-class EditOptions(tk.Toplevel, metaclass=MenuWidget, device="POS"):
-    font = ("Courier", 12, "bold")
-    
+class EditOptions(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
+    font = ("Courier", 16, "bold")
+
     def __new__(cls, parent, ticket, *args, **kwargs):
         if ticket.options:
             return super().__new__(cls)
@@ -82,7 +83,7 @@ class EditOptions(tk.Toplevel, metaclass=MenuWidget, device="POS"):
         return partial(cls, parent, ticket)
     
 class ItemLabel(tk.Label, metaclass=MenuWidget, device="POS"):
-
+    null_cmd = lambda: None
     font = ("Courier", 14, "bold")
     def __init__(self, parent, **kwargs):
         super().__init__(parent,
@@ -91,7 +92,12 @@ class ItemLabel(tk.Label, metaclass=MenuWidget, device="POS"):
                 anchor=tk.W,
                 **kwargs)
         self._isaddon = True
-    
+        self.command = self.null_cmd
+        self.bind("<Double-Button-1>", self.on_double_press)
+
+    def on_double_press(self, *args):
+        self.command()
+
     @property
     def isaddon(self):
         return self._isaddon
@@ -107,27 +113,28 @@ class ItemLabel(tk.Label, metaclass=MenuWidget, device="POS"):
             self["text"] = ticket.name
 
 
-class PriceButton(tk.Button, metaclass=WidgetType, device="POS"):
+class PriceButton(lib.LabelButton, metaclass=WidgetType, device="POS"):
     font = ("Courier", 14, "bold")
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, 
-                font=self.font, 
-                relief=tk.FLAT, 
-                state=tk.DISABLED,
-                width=len("$ 000.00"),
+        super().__init__(parent, "", font=self.font, width=8,
                 anchor=tk.W,
                 **kwargs)
+    
+    def remove_ticket(self, ticket):
+        def inner():
+            Order().remove(ticket)
+        return inner
 
     def _update(self, ticket):
 
         if ticket.total > 0:
             self["state"] = tk.ACTIVE
-            self["command"] = partial(Order().remove, ticket)
+            self.command = self.remove_ticket(ticket)
             self["text"] = "$ {:.2f}".format(ticket.total / 100)
             self["relief"] = tk.RAISED
         else:
-            self["command"] = lambda: None
+            self.command = self.null_cmd
             self["text"] = ""
             self["relief"] = tk.FLAT
             self["state"] = tk.DISABLED
@@ -135,9 +142,9 @@ class PriceButton(tk.Button, metaclass=WidgetType, device="POS"):
 class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
 
     font = ("Courier", 14)
-
     get_widgets = lambda parent, **kwargs: (ItemLabel(parent), OptionLabel(parent))
     null_ticket = Ticket(("", "", 0, {}))
+    
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.grid_columnconfigure(0, weight=1)
@@ -147,19 +154,20 @@ class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.button = PriceButton(self)
         self.button.grid(row=0, column=1, sticky="nswe")
 
-    def _update(self, index):
-        try:
-            order = Order()[index]
-        except IndexError:
-            return self.reset()
+    def edit_options(self, parent, ticket):
+        def inner():
+            EditOptions(parent, ticket)
+        return inner
+    
+    def _update(self, order):
 
-        [widget._update(order) for widget in self.widgets[0]]
-        [widget._update(order.addon1) for widget in self.widgets[1]]
-        [widget._update(order.addon2) for widget in self.widgets[2]]
-
+        for i, item in enumerate((order, order.addon1, order.addon2)):
+            for widget in self.widgets[i]:
+                widget._update(item)
+    
         tickets = order, order.addon1, order.addon2
-        for i, widgets in enumerate(self.widgets):
-            widgets[0].bind("<Double-Button-1>", EditOptions.call(widgets[0], tickets[i]))
+        for i, widget in enumerate(self.widgets):
+            widget[0].command = self.edit_options(widget[0], tickets[i])
 
         self._grid_widgets(0, order)
         self._grid_forget(0, order)
@@ -178,8 +186,9 @@ class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
         
     def _grid_forget(self, index, ticket):
         if not ticket:
-            [widget.grid_forget() for widget in self.widgets[index]]
-        
+            for widget in self.widgets[index]:
+                widget.grid_forget()
+    
         if not ticket.selected_options:
             self.widgets[index][1].grid_remove()
         
@@ -193,25 +202,29 @@ class OrdersFrame(ScrollFrame):
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.tickets = []
-        
+        self.tickets = lib.WidgetCache(TicketFrame, self.interior)
         self.interior.grid_columnconfigure(0, weight=1)
         self.interior.grid_columnconfigure(1, weight=1)
         # prevents window from collapsing on configure
         null_frame = TicketFrame(self.interior)
         null_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
         null_frame.lower()
-        
-    
+
     @update
     def update_order_list(self):
-        if len(self.tickets) < len(Order()):
-            self.tickets.append(TicketFrame(self.interior))
-
-        for i, ticket in enumerate(self.tickets):                
-            ticket._update(i)
-            ticket.grid(row=i, column=0,
+        order_list = Order()
+        order_size = len(order_list)
+        self.tickets.realloc(order_size)
+        cache_size = len(self.tickets)
+        
+        for i, ticket in enumerate(order_list):                
+            
+            self.tickets[i]._update(ticket)
+            self.tickets[i].grid(row=i, column=0,
                     columnspan=2,
                     padx=5,
                     sticky="we")
-
+        
+        # remove cached widgets
+        for widget in self.tickets[order_size:cache_size]:
+            widget.grid_remove()
