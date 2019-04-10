@@ -31,33 +31,40 @@ class WidgetCache(UserList):
                 self.data.pop().destroy()
 
 class LabelButton(tk.Label):
-
-    def __init__(self, parent, text, command=lambda *args:None, **kwargs):
+    null_cmd = lambda *args: None
+    def __init__(self, parent, text, command=None, relief=None, **kwargs):
         super().__init__(parent, text=text, **kwargs)
+        if command is None:
+            command = self.null_cmd
+        if relief is None:
+            relief = tk.RAISED
+
         self.command = command
-        self.configure(bd=2, relief=tk.RAISED)
+        self.configure(bd=2, relief=relief)
         self.bind("<Button-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
+        self._active = True
+    
         
     def activate(self):
         self["fg"] = "black"
         self["relief"] = tk.RAISED
-        self.bind("<Button-1>", self.on_click)
-        self.bind("<ButtonRelease-1>", self.on_release)
-        
+        self._active = True
+
     def deactivate(self):
         self["fg"] = "grey26"
         self["relief"] = tk.GROOVE
-        self.unbind("<Button-1>")
-        self.unbind("<ButtonRelease-1>")
-
+        self._active = False
+    
     def on_click(self, *args):
-        self.configure(relief=tk.SUNKEN, fg="black")
+        if self._active:
+            self.configure(relief=tk.SUNKEN, fg="black")
     
     def on_release(self, *args):
-        self.configure(relief=tk.RAISED, fg="black")
-        self.command()
-    
+        if self._active:
+            self.configure(relief=tk.RAISED, fg="black")
+            self.command()
+
 
 
 class ToggleSwitch(LabelButton):
@@ -70,7 +77,7 @@ class ToggleSwitch(LabelButton):
         self.config_true = config_true
         self.config_false = config_false
         self.state = state
-
+    
     @property
     def state(self):
         return self._state
@@ -84,7 +91,7 @@ class ToggleSwitch(LabelButton):
             self.configure(**self.config_false)
     
     def __bool__(self):
-        return self.state
+        return bool(self.state)
     
     def on_click(self, *args):
         pass
@@ -100,8 +107,6 @@ class ToggleSwitch(LabelButton):
     
     def reset(self):
         self.state = False
-
-    
 
 class EntryVariable(tk.Entry):
 
@@ -196,28 +201,53 @@ class TabbedFrame(tk.Frame):
     
     def __init__(self, parent, *tabs, **kwargs):
         super().__init__(parent, **kwargs)
+        
         assert all(isinstance(t, str) for t in tabs)
+
         self.style = ttk.Style(self)
         self.style.configure("TNotebook.Tab")
         self._notebook = ttk.Notebook(self, style="TNotebook")
         self.data = {
             name: tk.Frame(self._notebook)
             for name in tabs}
-        
+        self._tab_ids = {}
         for name in self.data:
             self._notebook.add(self.data[name], text=name)
+            self._tab_ids[name] = self._notebook.tabs()[-1]
+        
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        
-        self._notebook.grid(row=0, column=0, sticky="nswe")
-    
+
+        self._notebook.grid(row=0, column=0, sticky="nswe")    
+
     def __setitem__(self, key, value):
         self.data[key] = value
         self._notebook.add(self.data[key], text=key)
+        self._tab_ids[key] = self._notebook.tabs()[-1]
     
     def __getitem__(self, key):
         return self.data[key]
+    
+    def current(self):
+        return self._notebook.tab(self._notebook.select(), "text")
+    
+    def select(self, key):
+        self._notebook.select(self._tab_ids[key])
 
+    def tab_id(self, key):
+        return self._tab_ids[key]
+
+    def get(self, key, default=None):
+        if key in self.data:
+            return self.data[key]
+        return default
+
+    def pop(self, key):
+        frame = self.data.pop(key)
+        self._notebook.forget(self._tab_ids.pop(key))
+        return frame
+    
+ 
 
 def write_enable(func):
     @wraps(func)
@@ -228,5 +258,132 @@ def write_enable(func):
         self["state"] = tk.DISABLED
     return wrapper
 
+class Key(tk.Button):
+    ENTER = "\u23CE"
+    DEL   = "\u232B"
+    LEFT  = "\u2190"
+    RIGHT = "\u2192"
 
+    all_keys = list()
+    shift = False
+    def __init__(self, parent, char, font=("Courier", 14)):
+        super().__init__(parent,
+                bd=2,
+                relief=tk.RAISED,
+                bg="black",
+                fg="white",
+                font=font)
 
+        if not char.strip():
+            self["state"] = tk.DISABLED    
+            self["relief"] = tk.FLAT
+            self["bd"] = 0
+        
+        self.char = char
+        self.target = None
+        self.configure(text=self.char, command=self.on_press)
+        
+        Key.all_keys.append(self)
+
+    def on_press(self):            
+        if self.target is None:
+            return
+    
+        char = self.char.strip()
+        if Key.shift:
+            char = char.upper()
+        
+        if char.lower() == "space":
+            self.target.insert(tk.INSERT, " ")
+        
+        elif char.lower() == Key.DEL:
+            self.target.delete(self.target.index(tk.INSERT) - 1, tk.INSERT)
+        
+        elif char.lower() == Key.ENTER:
+            self.target.tk_focusNext().focus()
+
+        elif char.lower() == Key.LEFT:
+            idx = self.target.index(tk.INSERT) - 1
+            self.target.icursor(idx)
+        
+        elif char.lower() == Key.RIGHT:
+            idx = self.target.index(tk.INSERT) + 1
+            self.target.icursor(idx)
+
+        elif char.lower() == "shift":
+            Key.shift = True
+            return
+        else:
+            self.target.insert(tk.INSERT, char)
+        
+        Key.shift = False
+
+class Keyboard(tk.Frame):
+    
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        L = Key.LEFT
+        R = Key.RIGHT
+        self.chars = {
+            0: ("q","w","e","r","t","y","u","i","o","p", "", "","7","8","9","-"),
+            1: ("a","s","d","f","g","h","j","k","l", "", "", "","4","5","6","+"),
+            2: ("z","x","c","v","b","n","m",",",".",  L,  R, "","1","2","3","*"),
+            3: ( "", "", "", "", "", "", "", "", "", "", "", "", "", "","." ,"/")}
+
+        for i in range(15):
+            self.grid_columnconfigure(i, weight=1)
+        for row in self.chars:
+            for i, char in enumerate(self.chars[row]):
+                if char:
+                    k = Key(self, char)
+                    k.grid(row=row, column=i, sticky="nswe")
+    
+        shift = Key(self, "Shift")
+        shift.grid(row=3, column=0, columnspan=2, sticky="nswe")
+        space = Key(self, "Space")
+        space.grid(row=3, column=2, columnspan=4, sticky="nswe")
+        enter = Key(self, Key.ENTER)
+        enter.grid(row=1, column=9, columnspan=2, sticky="nswe")
+        back = Key(self, Key.DEL)
+        back.grid(row=0, column=10, sticky="nswe")
+
+        tk.Label(self, text=" ", bg="black").grid(row=3, column=6, columnspan=5, sticky="nswe", ipadx=2)
+        tk.Label(self, text=" ", bg="black").grid(row=0, column=11, rowspan=4, sticky="nswe", ipadx=14)
+        Key(self, "0").grid(row=3, column=12, columnspan=2, sticky="nswe")
+        self._target = None
+
+    @property
+    def target(self):
+        return self._target
+    
+    @target.setter
+    def target(self, value):
+        for key in Key.all_keys:
+            key.target = value
+
+class NumpadKeyboard(tk.Frame):
+
+    def __init__(self, parent, font=None, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._target = None
+        self.chars = {
+            0:( "", "", Key.DEL),
+            1:("7","8","9"),
+            2:("4","5","6"),
+            3:("1","2","3"),
+            4:("", "", "."),
+        }
+        for row in self.chars:
+            for i, char in enumerate(self.chars[row]):
+                Key(self, char, font=font).grid(row=row, column=i, sticky="nswe")
+        Key(self, "0", font=font).grid(row=4, column=0, columnspan=2, sticky="nswe")
+    
+    @property
+    def target(self):
+        return self._target
+    
+    @target.setter
+    def target(self, value):
+        self._target = value
+        for key in Key.all_keys:
+            key.target = value

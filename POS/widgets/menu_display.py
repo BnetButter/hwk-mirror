@@ -3,6 +3,7 @@ from lib.tkwidgets import LabelButton
 from lib import MenuType
 from lib import WidgetType
 from lib import MenuWidget
+from lib import ToplevelWidget
 from lib import MenuItem
 from .order import Order
 import lib
@@ -89,7 +90,7 @@ class Options(tk.Frame, metaclass=MenuWidget, device="POS"):
         if self.has_options:
             [item.reset() for item in self.option_toggles]
 
-class AddonOptions(tk.Toplevel, metaclass=WidgetType, device="POS"):
+class AddonOptions(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
     font = ("Courier", 12)
 
     def __init__(self, parent, order, **kwargs):
@@ -154,7 +155,7 @@ class OptionButton(LabelButton):
         self.configure(**self.inactive_config)
         self.gridded_frame = False
 
-        
+
 class ItemSelector(tk.Frame, metaclass=MenuWidget, device="POS"):
     font = ("Courier", 16)
     

@@ -56,7 +56,7 @@ Any additional server objects are instantiated to issue continuous updates to co
     - Determines system time
 
         Since Raspberry Pi's do not have an onboard battery, cutting power to RPI
-        for extended periods of will change system time. A GUI interface is provided for the user
+        for extended periods of time will change system time. A GUI interface is provided for the user
         to change system time if necessary.
 
 2. POS

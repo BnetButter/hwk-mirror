@@ -13,7 +13,6 @@ import tkinter as tk
 import asyncio
 import logging
 
-from .cyclicref import print_cycles
 
 
 class OptionLabel(tk.Text, metaclass=MenuWidget, device="POS"):
@@ -118,7 +117,8 @@ class PriceButton(lib.LabelButton, metaclass=WidgetType, device="POS"):
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, "", font=self.font, width=8,
-                anchor=tk.W,
+                relief=tk.FLAT,
+                anchor=tk.CENTER,
                 **kwargs)
     
     def remove_ticket(self, ticket):
@@ -129,7 +129,6 @@ class PriceButton(lib.LabelButton, metaclass=WidgetType, device="POS"):
     def _update(self, ticket):
 
         if ticket.total > 0:
-            self["state"] = tk.ACTIVE
             self.command = self.remove_ticket(ticket)
             self["text"] = "$ {:.2f}".format(ticket.total / 100)
             self["relief"] = tk.RAISED
@@ -137,7 +136,6 @@ class PriceButton(lib.LabelButton, metaclass=WidgetType, device="POS"):
             self.command = self.null_cmd
             self["text"] = ""
             self["relief"] = tk.FLAT
-            self["state"] = tk.DISABLED
 
 class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
 
@@ -151,7 +149,7 @@ class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.widgets = [TicketFrame.get_widgets(self) for i in range(3)]
 
         self.widgets[0][0].isaddon = False
-        self.button = PriceButton(self)
+        self.button = PriceButton(self, pady=2)
         self.button.grid(row=0, column=1, sticky="nswe")
 
     def edit_options(self, parent, ticket):
@@ -200,9 +198,12 @@ class TicketFrame(tk.Frame, metaclass=MenuWidget, device="POS"):
     
 class OrdersFrame(ScrollFrame):
 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.tickets = lib.WidgetCache(TicketFrame, self.interior)
+    def __init__(self, parent, widgettype=None):
+        super().__init__(parent)
+        if widgettype is None:
+            widgettype = TicketFrame
+
+        self.tickets = lib.WidgetCache(widgettype, self.interior)
         self.interior.grid_columnconfigure(0, weight=1)
         self.interior.grid_columnconfigure(1, weight=1)
         # prevents window from collapsing on configure
@@ -223,7 +224,8 @@ class OrdersFrame(ScrollFrame):
             self.tickets[i].grid(row=i, column=0,
                     columnspan=2,
                     padx=5,
-                    sticky="we")
+                    sticky="we",
+                    pady=2)
         
         # remove cached widgets
         for widget in self.tickets[order_size:cache_size]:

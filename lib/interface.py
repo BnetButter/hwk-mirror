@@ -265,13 +265,11 @@ class ClientInterface(GlobalState):
                         await ws.send("disconnect")
                         self.loads(await ws.recv())
                         break
-        
             return await self.server_message("disconnect", None)
         return coroutine()
         
     def disconnect(self, *args):
         self.connected = False
-
 
     def close(self):
         for task in self.tasks:

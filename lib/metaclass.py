@@ -83,7 +83,7 @@ class Ticket(MenuItem, metaclass=TicketType):
 
     parameters = property(itemgetter(5))
 
-class MenuType(type):
+class MenuType(ABCMeta):
     """Provides a class with an interface to menu information"""
     
     menu_items = MENUDATA["menu"]
@@ -95,24 +95,26 @@ class MenuType(type):
         return super().__new__(cls, name, bases, attr)
 
     def __init__(self, name, bases, attr, *args, **kwargs):
-        self.include_sides = self.config["Sides Included"]
-        self.include_drinks = self.config["Drinks Included"]
-        self.two_sides = self.config["Two Sides"]
-        self.no_addons = self.config["No Addons"]
-        self.register = self.config["Register"]
         self.payment_types = self.config["Payment Types"]
-    
+
+    def category_configurations(self):
+        return {
+            key: self.config[key]
+            for key in self.config
+                if key != "Payment Types" and key != "Tax"
+        }
+
     def category(self, category, cls=MenuItem):
         """return a list of menu items"""
-        if not category:
+        if not category or category not in self.menu.keys():
             return []
-
         return [
             cls(category, item,
                     self.menu[category][item]["Price"],
                     self.menu[category][item]["Options"])
                 for item in self.menu[category]
             ]
+
 
     @staticmethod
     def get_item(category, name):
@@ -124,7 +126,28 @@ class MenuType(type):
     def null_item(self, cls=MenuItem):
         return cls("", "", 0, {})
     
-    # volatile attributes
+    # volatile attributes. changes on menu edit
+    
+    @property
+    def include_sides(self):
+        return self.config["Sides Included"]
+    
+    @property
+    def include_drinks(self):
+        return self.config["Drinks Included"]
+
+    @property
+    def two_sides(self):
+        return self.config["Two Sides"]
+        
+    @property
+    def no_addons(self):
+        return self.config["No Addons"]
+    
+    @property
+    def register(self):
+        return self.config["Register"]
+
     @property
     def all_item_names(self):
         items = [self.menu[category].keys() for category in self.menu]
@@ -157,7 +180,7 @@ class MenuType(type):
         return Decimal(self.config["Tax"]).quantize(Decimal('.01'))
     
 
-class WidgetType(type):
+class WidgetType(ABCMeta):
     """Instance a class with font configuration data"""
 
     def __new__(cls, name, bases, attr, device, *args, **kwargs):    
@@ -200,8 +223,10 @@ class OrderInterface(MenuType, UserList, TicketType):
         return "\n".join(lines)
 
     def remove(self, item):
-        super().remove(item)
-        
+        for i, order in enumerate(self.data):
+            if item is order:
+                return self.pop(i)
+
     @property
     def total(self)->int:
         return sum(ticket.total for ticket in self.data)
@@ -219,7 +244,78 @@ class OrderInterface(MenuType, UserList, TicketType):
     def tax(self)->int:
         return self.total - self.subtotal
 
+class ToplevelType(type):
+    """Centers toplevel window"""
+
+    @staticmethod
+    def center(result):
+        screen_center_X, screen_center_Y = (            
+                int(result.winfo_screenwidth() / 2),
+                int(result.winfo_screenheight() / 2))
+
+        widget_center_X, widget_center_Y = tuple(
+                int(int(dim) / 2) for dim in result.geometry().split("+")[0].split("x"))
+        x, y = (
+            screen_center_X - widget_center_X,
+            screen_center_Y - widget_center_Y)
+        result.geometry(f"+{x}+{y}")
+        return result
+
+    def __call__(self, *args, **kwargs):
+        result = super().__call__(*args, **kwargs)
+        if result is not None:
+            result.attributes("-topmost", True)
+            return self.center(result)
+        
 # resolve metaclas conflict
-class MenuWidget(WidgetType, MenuType):
-    pass
+class MenuWidget(WidgetType, MenuType): ...
+
+
+class ToplevelWidget(MenuWidget, ToplevelType):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        ToplevelType.__init__(self, *args, **kwargs)
+    
+class ReinstanceType(MenuWidget):
+    objects = list()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance = None
+    
+    def __call__(self, *args, **kwargs):
+        if self.instance is None:
+            self.instance = super().__call__(*args, **kwargs)
+            type(self).objects.append((self, args, kwargs))
+            return self.instance
+        else:
+            original = self.instance
+            grid_info = self.instance.grid_info()
+            grid_info.pop("in")
+
+            self.instance = super().__call__(*args, **kwargs)
+            original.destroy()
+            self.instance.grid(**grid_info)
+            return self.instance
+    
+    @classmethod
+    def reinstance(cls, target=None):
+        if target is None:
+            for cls, args, kwargs in cls.objects:
+                return cls(*args, **kwargs)
+        else:
+            for cls, args, kwargs in cls.objects:
+                if target == cls:
+                    return cls(*args, **kwargs)
+        
+                
+class SingletonType(type):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance = None
+
+    def __call__(self, *args, **kwargs):
+        if self.instance is None:
+            self.instance = super().__call__(*args, **kwargs)
+        return self.instance
 

@@ -8,9 +8,12 @@ import display
 import server
 
 from POS import POSProtocol, POSProtocolBase
+from mem_top import mem_top
 
 # TODO make delegate responsible for calculating total. 
 # adjust "OrderInterface" class accordingly
+
+# TODO write reinstance function for progress_tab
 
 def kill_server(port=None):
     """kill program connected to port"""
@@ -67,3 +70,9 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+    
+
+
+    
+    

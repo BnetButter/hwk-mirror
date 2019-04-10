@@ -24,6 +24,7 @@ import asyncio
 import decimal
 import logging
 
+
 def alert(message):
     logging.getLogger("main.POS.gui.stdout").info(f"ALERT - {message}")
 
@@ -297,7 +298,6 @@ class TicketEditorFrame(tk.Frame):
         # remove excess cached widgets
         for ticket in self.widgets[len(order_list):len(self.widgets)]: 
             ticket.grid_remove()
-        
         self.grid(row=index, column=0, columnspan=5, sticky="nswe", pady=2)
 
     @staticmethod
@@ -518,6 +518,7 @@ class ProgressFrame(ScrollFrame):
         self.interior.grid_columnconfigure(1, weight=1)
         self.widget_cache = WidgetCache(OrderProgress, self.interior, initial_size=initial_size)
 
+
     @update
     def update_order_status(self):
         order_queue = AsyncTk().forward("order_queue")
@@ -527,11 +528,11 @@ class ProgressFrame(ScrollFrame):
         queue_size = len(order_queue)
         self.widget_cache.realloc(queue_size)
         cache_size = len(self.widget_cache)
-        for i, ticket_num in enumerate(order_queue):
-            self.widget_cache[i]._update(ticket_num)
+        for i, ticket in enumerate(order_queue):
+            self.widget_cache[i]._update(ticket)
             self.widget_cache[i].grid(row=(cache_size - i) * 2, column=0, columnspan=5, sticky="we", padx=5)
             self.widget_cache[i].index = (cache_size - i) * 2
-
+        
         # remove excess cached widgets
         for widget in self.widget_cache[queue_size:cache_size]:
             widget.grid_remove()

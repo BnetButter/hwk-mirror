@@ -5,23 +5,12 @@ from .data import GUI_STDERR
 from .data import GUI_STDOUT
 from .data import output_message
 from .stream import stdout, stderr
+from .metaclass import SingletonType
 import asyncio
 import tkinter as tk
 import logging
+import mem_top
 
-gui_stderr = logging.getLogger(GUI_STDERR)
-gui_stdout = logging.getLogger(GUI_STDOUT)
-
-class singleton(type):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.instance = None
-
-    def __call__(self, *args, **kwargs):
-        if self.instance is None:
-            self.instance = super().__call__(*args, **kwargs)
-        return self.instance
 
 class AsyncInterface:
 
@@ -30,7 +19,6 @@ class AsyncInterface:
 
     def __init__(self, delegate):
         self.delegate = delegate
-
 
     def forward(self, request, *args, **kwargs):
         if hasattr(self.delegate, request):
@@ -54,8 +42,7 @@ class AsyncInterface:
         self.tasks.append(self.loop.create_task(task))
     
 
-
-class AsyncTk(AsyncInterface, tk.Tk, metaclass=singleton):
+class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
 
     update_tasks = list()
     instance = None
@@ -77,15 +64,14 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=singleton):
             try:
                 update_task()
             except:
+                logging.getLogger("main.POS.gui.stderr").exception("")
                 self.update_tasks.remove(update_task)
-                gui_stderr.exception("")
         super().update()
 
     def add_task(self, task):
         self.tasks.append(self.loop.create_task(task))
 
     def mainloop(self):
-
         async def _mainloop():
             self.running = True
             while self.running:
@@ -93,7 +79,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=singleton):
                 await asyncio.sleep(self.interval)
             else:
                 self.forward("disconnect")
-                await asyncio.sleep(self.interval * 2)
+                await asyncio.sleep(1)
                 for task in self.tasks:
                     task.cancel()
                 self.loop.stop()
@@ -107,7 +93,6 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=singleton):
         logger.addHandler(stdout_stream)
         logger.addHandler(stderr_stream)
         self.loop.create_task(_mainloop())
-
         logging.getLogger(f"{logger.name}.stdout").info("System Initiated")
         self.loop.run_forever()
     

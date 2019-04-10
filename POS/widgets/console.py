@@ -102,36 +102,3 @@ class console_stderr(console_stdout, metaclass=ConsoleType, stream=stderr):
     font = ("Courier", 10)
     font_height = 6
     font_width = 80
-
-
-
-from lib import TabbedFrame
-from tkinter import ttk
-
-class Console(TabbedFrame, metaclass=WidgetType, device="POS"):        
-    tabfont = ("Courier", 10)
-    
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, "stdout", "stderr", "settings", **kwargs)
-        style = ttk.Style(self)
-        style.configure("TNotebook.Tab", font=self.tabfont, padding=1)
-        style.configure("TNotebook", padding=-1)
-   
-        stdout_scrollbar = tk.Scrollbar(self["stdout"])
-        stderr_scrollbar = tk.Scrollbar(self["stderr"])
-        
-        stdout_textbox = console_stdout(self["stdout"],
-                yscrollcommand=stdout_scrollbar.set)
-        stderr_textbox = console_stderr(self["stderr"], 
-                yscrollcommand=stderr_scrollbar.set)
-
-        stdout_scrollbar["command"] = stdout_textbox.yview
-        stderr_scrollbar["command"] = stderr_textbox.yview
-
-        self["stdout"].grid_columnconfigure(0, weight=1)
-        self["stderr"].grid_columnconfigure(0, weight=1)
-
-        stdout_textbox.grid(row=0, column=0, sticky="nswe")
-        stderr_textbox.grid(row=0, column=0, sticky="nswe")
-        stdout_scrollbar.grid(row=0, column=1, sticky="nse")
-        stderr_scrollbar.grid(row=0, column=1, sticky="nse")

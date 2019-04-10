@@ -29,6 +29,7 @@ class POSProtocol(POSInterface):
         self.test_network_connection()
         self.connect_task = self.connect()
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
+        self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
 
     def get_ticket_no(self, result):
         if self.ticket_no is not None:
@@ -115,8 +116,7 @@ class POSProtocol(POSInterface):
     
     def calculate_total(self, order): ...
 
-    def edit_menu(self): ...
-    
+    def edit_menu(self, new_menu): ...
 
 
     def get_order_status(self, ticket_no, *args):
@@ -136,7 +136,7 @@ class POSProtocol(POSInterface):
                 
                 if item[1] and item[5].get("status") == TICKET_COMPLETE:
                     num_completed += 1
-    
+       
         return int((num_completed/num_items) * 100)
     
     def get_time(self): ...

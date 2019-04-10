@@ -40,7 +40,6 @@ class GlobalState:
             "connected_clients": self.connected_clients,
             "shutdown_now": self.shutdown_now,
             }
-        
         return json.dumps(dct)
 
 

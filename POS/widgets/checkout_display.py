@@ -7,12 +7,13 @@ from lib import MenuWidget
 from lib import WidgetType
 from lib import ToggleSwitch
 from lib import LabelButton
+from lib import ToplevelWidget
+from lib import NumpadKeyboard
 from lib import AsyncTk, update
 from .order import Ticket, Order
 from .order_display import ItemLabel
 from .order_display import TicketFrame
 from .order_display import OrdersFrame
-from collections import UserDict
 from functools import partial
 import tkinter as tk
 import asyncio
@@ -67,7 +68,6 @@ class CheckoutLabel(tk.Frame, metaclass=MenuWidget, device="POS"):
             self.label["text"] = "    " + ticket.name
         else:
             self.label["text"] = ticket.name
-        
 
 class CheckoutTicketFrame(tk.Frame):
     null_ticket = Ticket(("", "", 0, {}))
@@ -89,12 +89,7 @@ class CheckoutTicketFrame(tk.Frame):
         if not ticket:
             item.grid_forget()
 
-    def _update(self, index):
-        try:
-            order = Order()[index]
-        except IndexError:
-            return self.reset()
-
+    def _update(self, order):
         tickets = order, order.addon1, order.addon2
       
         for i, ticket in enumerate(tickets):
@@ -106,6 +101,20 @@ class CheckoutTicketFrame(tk.Frame):
         for widget in self.widgets:
             widget._update(self.null_ticket)
 
+class Numpad(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
+    font=("Courier", 20)
+    
+    def __init__(self, parent, target, *args, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.title(string="Num Pad")
+        self.numpad = NumpadKeyboard(self, font=self.font, bd=5, relief=tk.RAISED)
+        self.numpad.pack(fill=tk.BOTH)
+        self.numpad.target = target
+        self.parent = parent
+      
+    def destroy(self, *args):
+        self.parent.focus_set()
+        super().destroy()
 
 class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
     font = ("Courier", 16)
@@ -115,7 +124,6 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
         self.cash_given = tk.StringVar(self)
         self.change_due = tk.StringVar(self)
         
-
         cash_given_frame = self.labeled_entry("Cash Given ", self.cash_given, state=tk.NORMAL)
         change_due_frame = self.labeled_entry("Change Due ", self.change_due)
         cash_given_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
@@ -150,6 +158,8 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
                 disabledbackground="white",
                 disabledforeground="black")
         
+        entry.bind("<FocusIn>", partial(Numpad, self, entry))
+        
         label.grid(row=0, column=0, sticky="nse")
         entry.grid(row=0, column=1, sticky="nsw")
         return frame
@@ -164,7 +174,7 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
             
 
 
-class ConfirmationWindow(tk.Toplevel, metaclass=WidgetType, device="POS"):
+class ConfirmationWindow(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
     font=("Courier", 12)
 
     __slots__ = ["payment_type", "textbox"]
@@ -240,7 +250,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
     font=("Courier", 16)
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
+        super().__init__(parent, widgettype=CheckoutTicketFrame)
         self.num_payment_types = len(CheckoutFrame.payment_types)
         self._ticket = tk.StringVar(self)
         self._ticket.set("000")
@@ -310,8 +320,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
 
     @update
     def update_order_list(self):
-        grid_offset = self.num_payment_types
-        num_tickets = len(Order())
+        
 
         if not Order():
             for button in self.buttons:
@@ -319,17 +328,19 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
         else:
             for button in self.buttons:
                 button.activate()
-
-        if len(self.tickets) < num_tickets:
-                self.tickets.append(CheckoutTicketFrame(self.interior, bd=2, relief=tk.RIDGE))
         
-        for i, ticket in enumerate(self.tickets):
-            if i < num_tickets:
-                ticket._update(i)
-                ticket.grid(row=i + grid_offset + 3,
-                        column=0,
-                        padx=10,
-                        pady=5,
-                        sticky="nswe")
-            else:
-                ticket.grid_forget()
+        grid_offset = self.num_payment_types
+        order_size = len(Order())
+        self.tickets.realloc(order_size)
+        cache_size = len(self.tickets)
+
+        for i, ticket in enumerate(Order()):
+            self.tickets[i]._update(ticket)
+            self.tickets[i].grid(row=i + grid_offset + 3,
+                    column=0,
+                    padx=10,
+                    pady=5,
+                    sticky="nswe")
+       
+        for widget in self.tickets[order_size:cache_size]:
+            widget.grid_remove()

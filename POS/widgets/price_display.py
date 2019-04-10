@@ -52,8 +52,6 @@ class PriceDisplay(tk.Frame):
                     padx=5,
                     columnspan=2)
         
-        self.update()
-
     @update
     def update(self):
         fmt = "$ {:.2f}"
