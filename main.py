@@ -1,4 +1,5 @@
-import logging
+import POS
+import Display
 import sys
 import subprocess
 import multiprocessing
@@ -6,14 +7,6 @@ import lib
 import pos
 import display
 import server
-
-from POS import POSProtocol, POSProtocolBase
-from mem_top import mem_top
-
-# TODO make delegate responsible for calculating total. 
-# adjust "OrderInterface" class accordingly
-
-# TODO write reinstance function for progress_tab
 
 def kill_server(port=None):
     """kill program connected to port"""
@@ -41,38 +34,21 @@ def kill_server(port=None):
         else:
             print(f"{port} is clear.")
 
-from POS import POSProtocol
-
 def main():
-
-    logger = logging.getLogger("main")
-    logger.setLevel(logging.DEBUG)
-    
-    handler = logging.StreamHandler(stream=sys.stdout)
-    handler.setFormatter(logging.Formatter("%(name)s - %(message)s"))
-    logger.addHandler(handler)
-    
-    logger.info("starting main")
-
-
-    pos_process = multiprocessing.Process(target=pos.main, args=(POSProtocol,))
+    pos_process = multiprocessing.Process(target=pos.main, args=(POS.POSProtocol,))
     server_process = multiprocessing.Process(target=server.main)
+    display_process = multiprocessing.Process(target=display.main, args=(Display.DisplayProtocol, ))
     try:
         arg = sys.argv[1]
         if arg == "kill":
             return kill_server(lib.CONFIGDATA["port"])
         else:
-            {"pos":pos_process, "server": server_process}.get(sys.argv[1]).start()
+            {"pos":pos_process, "server": server_process, "display": display_process}.get(sys.argv[1]).start()
     
     except IndexError:
         server_process.start()
         pos_process.start()
-    
+        display_process.start()
+
 if __name__ == "__main__":
     main()
-
-    
-
-
-    
-    

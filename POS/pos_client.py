@@ -1,4 +1,3 @@
-from .default_protocol import POSProtocolBase
 import functools
 from lib import GUI_STDERR, GUI_STDOUT, output_message
 from lib import APPDATA
@@ -8,6 +7,7 @@ from lib import POSInterface, Pointer
 from lib import TICKET_QUEUED, TICKET_COMPLETE, TICKET_WORKING
 from lib import OrderInterface
 from POS import Order, NewOrder
+import lib
 import decimal
 from operator import itemgetter
 from time import localtime, strftime
@@ -44,8 +44,8 @@ class POSProtocol(POSInterface):
         order_dct["payment_type"] = payment_type
         order_dct["cash_given"] = cash_given
         order_dct["change_due"] = change_due
-
-        task = self.create_task(self.server_message("new_order", order_dct))
+        
+        task = self.loop.create_task(self.server_message("new_order", order_dct))
         def callback(task):
             ticket_no = task.result()
             ticket_no = "{:03d}".format(ticket_no)
@@ -54,17 +54,9 @@ class POSProtocol(POSInterface):
             NewOrder()
 
         task.add_done_callback(callback)
-
-    def get_connection_status(self, network_indicator, server_indicator, display_indicator):
-        network_indicator.set(self.network)
-        server_indicator.set(self.connected)
-        if self.connected_clients is None:
-            display_indicator.set(False)
-        else:
-            display_indicator.set("Display" in self.connected_clients)
             
     def cancel_order(self, ticket_no):
-        task = self.create_task(self.server_message("cancel_order", ticket_no))
+        task = self.loop.create_task(self.server_message("cancel_order", ticket_no))
         def callback(task):
             _ticket_no = "{:03d}".format(ticket_no)
             result = task.result()
@@ -94,7 +86,7 @@ class POSProtocol(POSInterface):
                 total,
                 original_dct["payment_type"])
 
-        task = self.create_task(self.server_message("modify_order", (ticket_no, modified_dct)))
+        task = self.loop.create_task(self.server_message("modify_order", (ticket_no, modified_dct)))
         def callback(task):
             _ticket_no = "{:03d}".format(ticket_no)
             result, reason = task.result()
@@ -114,36 +106,73 @@ class POSProtocol(POSInterface):
             return (self.order_queue[str(ticket_no)].get(arg) for arg in args)
         return ()
     
-    def calculate_total(self, order): ...
+    def remove_completed(self):
+        self.loop.create_task(
+                self.server_message("remove_completed", None))
 
-    def edit_menu(self, new_menu): ...
-
-
+    def edit_menu(self, new_menu):
+        task = self.loop.create_task(
+                self.server_message("edit_menu", new_menu))
+        def done_callback(task):
+            result, reason = task.result()
+            if result:
+                self.stdout.info("Menu saved")
+            else:
+                self.stdout.info("WARNING - Failed to save menu")
+                self.stderr.warning("WARNING - Failed to save menu")
+        task.add_done_callback(done_callback)
+        
     def get_order_status(self, ticket_no, *args):
         tickets = self.order_queue.get(str(ticket_no))["items"]
         if tickets is None:
             return 100
-        
+
         num_items = 0
         num_completed = 0
-
-        
         for ticket in tickets:
             ticket = ticket[:6], ticket[6], ticket[7]
             for item in ticket:
                 if item[1]:
                     num_items += 1
-                
                 if item[1] and item[5].get("status") == TICKET_COMPLETE:
                     num_completed += 1
-       
         return int((num_completed/num_items) * 100)
+
+    def get_time(self):
+        raise NotImplementedError
+
+    def global_shutdown(self, shutdown_in):
+        self.loop.create_task(self.server_message("global_shutdown", shutdown_in))
     
-    def get_time(self): ...
+    def edit_order(self):
+        raise NotImplementedError
     
-    def global_shutdown(self): ...
-    
-    def edit_order(self): ...
+    @staticmethod
+    def _item_total(item):
+        if not item.name:
+            return 0
+        total = item.price
+        for option in item.selected_options:
+            total += item.options[option]
+        return total
+
+    def get_total(self, item, addon1, addon2):
+        assert all(isinstance(type(_item), lib.TicketType) for _item in (item, addon1, addon2))
+        total = self._item_total(item)
+        if item.category in Order().two_sides \
+                or item.category in Order().no_addons:
+            return total
+        
+        if item.category not in Order().include_drinks:
+            for addon in (addon1, addon2):
+                if addon.category == "Drinks":
+                    total += self._item_total(addon)
+
+        if item.category not in Order().include_sides:
+            for addon in (addon1, addon2):
+                if addon.category == "Sides":
+                    total += self._item_total(addon)
+        return total
 
     
     @staticmethod
