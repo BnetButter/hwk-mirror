@@ -115,9 +115,6 @@ class PriceEntry(tk.Frame):
         self.item_entry.bind("<FocusIn>", self.acquire(self.item_entry))
         self.price_entry.bind("<FocusIn>", self.acquire(self.price_entry))
 
-    
-        
-
     def acquire(self, entry):
         def _inner(event):
             self.keyboard.target = entry
@@ -167,8 +164,6 @@ class ItemOptionsEditor(PriceEntry, metaclass=lib.MenuWidget, device="POS"):
         self.removed = True
         super().destroy()
     
-
-
 
 class MenuItemEditor(PriceEntry, metaclass=lib.MenuWidget, device="POS"):
     font=("Courier", 14)
@@ -295,6 +290,7 @@ class EditorCategoryFrame(lib.ScrollFrame, metaclass=MenuType):
         item_widget.grid(row=len(self.widgets), column=0, columnspan=4, sticky="nswe")
         self.widgets.append(item_widget)
         
+
 class MenuEditorTabs(lib.TabbedFrame, metaclass=lib.MenuWidget, device="POS"):
     tabfont = ("Courier", 14)
 
@@ -311,6 +307,7 @@ class MenuEditorTabs(lib.TabbedFrame, metaclass=lib.MenuWidget, device="POS"):
         return "\n".join((EditorDelegate().edit_item(*item_editor.get())
             for editor in self.data.values()
                 for item_editor in editor.widgets))
+
 
 class ConfigFrame(tk.Frame, metaclass=MenuType):
 
@@ -352,12 +349,14 @@ class ConfigFrame(tk.Frame, metaclass=MenuType):
             messages.append(message)
         return "\n".join((message for message in messages if message))
 
+
 class ItemAdder(tk.Frame):
 
     def __init__(self, parent, keyboard, font=None, **kwargs):
         super().__init__(parent, **kwargs)
         self.keyboard = keyboard
         self._category = tk.StringVar(self)
+        self._has_focus = False
         self.cat_entry = tk.Entry(self, textvariable=self._category, font=font)
         self.entry = PriceEntry(self, font=font)
         self.add_item = lib.LabelButton(self, "Add", font=font)
@@ -365,10 +364,15 @@ class ItemAdder(tk.Frame):
         self.entry.grid(row=0, column=1, sticky="nswe", padx=2, pady=2)
         self.add_item.grid(row=0, column=2, sticky="nswe", ipadx=2, pady=2)
         self.cat_entry.bind("<FocusIn>", self.acquire)
+        self.cat_entry.bind("<FocusOut>", self.on_focus_out)
+    
+    def on_focus_out(self, event):
+        self._has_focus = False
 
     def acquire(self, *args):
-        self.keyboard.target = self.cat_entry    
-
+        self.keyboard.target = self.cat_entry
+        self._has_focus = True
+    
     def clear(self):
         self.entry.item = ""
         self.entry.price = ""
@@ -383,14 +387,9 @@ class ItemAdder(tk.Frame):
 
     @category.setter
     def category(self, value):
-        focused_widget = self.focus_get()
-
-        if (focused_widget is not self.cat_entry
-                and focused_widget is not self.entry.item_entry
-                and focused_widget is not self.entry.price_entry):
-        
+        if not self._has_focus:
             self._category.set(value)
-        
+
 class ButtonFrame(tk.Frame):
 
     def __init__(self, parent, font=None, **kwargs):

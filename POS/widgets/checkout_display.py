@@ -101,6 +101,7 @@ class CheckoutTicketFrame(tk.Frame):
         for widget in self.widgets:
             widget._update(self.null_ticket)
 
+
 class Numpad(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
     font=("Courier", 20)
     
@@ -172,7 +173,6 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
         else:
             self.change_due.set("{:.2f}".format(change / 100))
             
-
 
 class ConfirmationWindow(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
     font=("Courier", 12)

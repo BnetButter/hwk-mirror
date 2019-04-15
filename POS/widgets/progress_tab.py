@@ -31,7 +31,8 @@ def alert(message):
 # essentially the same as lib.Ticket
 class MutableTicket(UserList, metaclass=TicketType):
     
-    def __init__(self, ticket):
+    def __init__(self, ticket=None):
+        
         self.data = list(ticket[:6])
 
     @property
@@ -186,7 +187,7 @@ class ItemEditor(metaclass=ItemEditorType, device="POS"):
         self.add_item.destroy()
     
 
-class TicketEditor(tk.Frame):
+class TicketEditor(tk.Frame, metaclass=MenuType):
     
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
@@ -199,18 +200,21 @@ class TicketEditor(tk.Frame):
         item.grid(row=1, column=0, isaddon=False)
         addon1.grid(row=2, column=0)
         addon2.grid(row=3, column=0)
-        self.isgridded = True
+        self.is_gridded = True
     
     def total(self):    
-        return sum(item.get().total for item in self.item_editors)
-    
+        items = (self.item_editors[0].get(),
+                self.item_editors[1].get(),
+                self.item_editors[2].get())
+        return AsyncTk().forward("get_total", *items)
+       
     def grid(self, **kwargs):
         super().grid(**kwargs)
-        self.isgridded = True
+        self.is_gridded = True
     
     def grid_remove(self):
         super().grid_remove()
-        self.isgridded = False
+        self.is_gridded = False
 
     @property
     def removed(self):
@@ -263,8 +267,10 @@ class TicketEditorFrame(tk.Frame):
 
         self.calculator_frame.grid(row=0, column=1, sticky="nswe", columnspan=2, pady=2, padx=2)
         self.ticket_no = None
+        self.orderprogress = None
         self.is_gridded = False
         self.original_total = None
+
 
     @property
     def difference(self):
@@ -279,7 +285,9 @@ class TicketEditorFrame(tk.Frame):
     def difference(self, value):
         self._difference.set("{:.2f}".format(value / 100))
 
-    def set(self, ticket_no, index):
+    def set(self, ticket_no, index, orderprogress):
+        self.orderprogress = orderprogress
+        
         self.ticket_no = int(ticket_no)
         self.original_total, order_list = AsyncTk().forward(
                 "get_order_info", self.ticket_no, "total", "items")
@@ -289,7 +297,7 @@ class TicketEditorFrame(tk.Frame):
             item, addon1, addon2 = (MutableTicket(ticket),
                     MutableTicket(ticket[6]),
                     MutableTicket(ticket[7]))
-
+    
             # combobox needs to know what items to show by looking up
             # the item's category
             self.widgets[i].set(*self.set_category(item, addon1, addon2))
@@ -298,7 +306,7 @@ class TicketEditorFrame(tk.Frame):
         # remove excess cached widgets
         for ticket in self.widgets[len(order_list):len(self.widgets)]: 
             ticket.grid_remove()
-        self.grid(row=index, column=0, columnspan=5, sticky="nswe", pady=2)
+
 
     @staticmethod
     def set_category(item, addon1, addon2):
@@ -324,13 +332,17 @@ class TicketEditorFrame(tk.Frame):
         super().grid_remove()
 
     def create_order(self):
-        return [widget.get() for widget in self.widgets if not widget.removed]
+        return [widget.get() for widget in self.widgets if widget.is_gridded]
       
     @update
     def update(self):
+        # no point updating if no one can see it.
         if not self.is_gridded:
             return
-        self.difference = sum(widget.total() for widget in self.widgets) - self.original_total
+    
+        self.difference = sum(widget.total()
+                for widget in self.widgets
+                    if widget.is_gridded) - self.original_total
         self.calculator.update(self.difference)
 
 
@@ -380,13 +392,11 @@ class ProgressBar(tk.Frame):
 class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
     font=("Courier", 14)
     editor = None
-    confirm_modify = None
 
     def __new__(cls, parent, **kwargs):
         if cls.editor is None:
             cls.editor = TicketEditorFrame(parent)
             cls.editor.update()
-            cls.confirm_modify = ConfirmationFrame(parent, first="Return", font=cls.font)
         return super().__new__(cls)
 
     def __init__(self, parent, **kwargs):
@@ -395,6 +405,8 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.original_order = None
         self.ticket_no = tk.Label(self, font=self.font, relief=tk.SUNKEN, bd=1, bg="white")
         self.index = None
+        self.completed = False
+        self.is_gridded = False
         
         self.progress = ProgressBar(self)
         self.cancel_button = LabelButton(self, "Cancel", width=7, font=self.font, bg="red", command=self.on_cancel)
@@ -404,6 +416,7 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.confirm_cancel.set_confirm(self.on_cancel_confirm)
         self.confirm_cancel.set_return(self.on_cancel_return)
         
+        self.confirm_modify = ConfirmationFrame(self, first="Return", font=self.font)
         self.confirm_modify.set_confirm(self.on_modify_confirm)
         self.confirm_modify.set_return(self.on_modify_return)
 
@@ -435,17 +448,21 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         
         self.modify_button.lift()
         self.cancel_button.lift()
-    
+        
     def _update(self, ticket_no):
         ticket_no = int(ticket_no)
         self.ticket_no["text"] = "{:03d}".format(ticket_no)
-        self.progress.status = AsyncTk().forward("get_order_status", ticket_no)
-        if self.progress.status == 100:
-            self.cancel_button.deactivate()
+        self.progress.status = status = AsyncTk().forward("get_order_status", ticket_no)
+        if status == 100:
             self.modify_button.deactivate()
+            self.cancel_button.deactivate()
+
         else:
-            self.cancel_button.activate()
             self.modify_button.activate()
+            self.modify_button.activate()
+        
+        if self.editor.grid_info().get("in") != self:
+            self.confirm_modify.lower()
 
     def on_cancel(self):
         items, = AsyncTk().forward("get_order_info", int(self.ticket_no["text"]), "items")
@@ -461,12 +478,13 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.confirm_modify.grid(row=1,
                 column=3,
                 columnspan=2,
-                sticky="nswe",
-                in_=self)
-
-        self.confirm_modify.lift()
-        self.editor.set(str(int(self.ticket_no["text"])), self.index + 1)
+                sticky="nswe")
     
+        self.confirm_modify.lift()
+        self.editor.set(str(int(self.ticket_no["text"])), self.index + 1, self)
+        self.editor.grid(row=2, column=0, columnspan=5, sticky="nswe", pady=2, in_=self)
+        self.editor.lift()
+
     def on_cancel_confirm(self):
         self.cancel_button.lift()
         self.modify_button.lift()
@@ -491,8 +509,8 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
 
         AsyncTk().forward("cancel_order", ticket_no)
         if self.editor.ticket_no == ticket_no:
-            self.editor.grid_forget()
-            self.confirm_modify.grid_forget()
+            self.editor.grid_remove()
+            self.confirm_modify.grid_remove()
     
     def on_cancel_return(self):
         self.cancel_button.lift()
@@ -511,28 +529,40 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.modify_button.lift()
         self.cancel_button.lift()
 
+    def grid(self, **kwargs):
+        self.is_gridded = True
+        super().grid(**kwargs)
+    
+    def grid_remove(self):
+        if self.editor.grid_info().get("in") == self:
+            self.editor.grid_remove()
+            self.confirm_modify.grid_remove()
+        super().grid_remove()
+    
 class ProgressFrame(ScrollFrame):
 
-    def __init__(self, parent, initial_size=10, **kwargs):
+    def __init__(self, parent, initial_size=10, show_completed_num=2, **kwargs):
         super().__init__(parent, **kwargs)
         self.interior.grid_columnconfigure(1, weight=1)
         self.widget_cache = WidgetCache(OrderProgress, self.interior, initial_size=initial_size)
-
-
+        self.show_completed_num = show_completed_num
+    
     @update
     def update_order_status(self):
         order_queue = AsyncTk().forward("order_queue")
         if order_queue is None:
             return
-    
+
         queue_size = len(order_queue)
         self.widget_cache.realloc(queue_size)
         cache_size = len(self.widget_cache)
+
         for i, ticket in enumerate(order_queue):
             self.widget_cache[i]._update(ticket)
             self.widget_cache[i].grid(row=(cache_size - i) * 2, column=0, columnspan=5, sticky="we", padx=5)
             self.widget_cache[i].index = (cache_size - i) * 2
-        
+
         # remove excess cached widgets
         for widget in self.widget_cache[queue_size:cache_size]:
             widget.grid_remove()
+

@@ -34,10 +34,19 @@ def total(self):
     total = self.price
     for option in self.selected_options:
         total += self.options[option]
-
-    if self.category not in type(self).two_sides:
-        total += self.addon1.total
-        total += self.addon2.total
+    
+    cls = type(self)
+    if self.category in cls.two_sides \
+            or self.category in cls.no_addons:
+        return total
+    if self.category not in cls.include_drinks:        
+        for addon in (self.addon1, self.addon2):
+            if addon.category == "Drinks":
+                total += addon.total
+    if self.category not in cls.include_sides:
+        for addon in (self.addon1, self.addon2):
+            if addon.category == "Sides":
+                total += addon.total
     return total
 
 parameters = property(itemgetter(5))
