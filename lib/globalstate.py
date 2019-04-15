@@ -42,8 +42,6 @@ class GlobalState:
             }
         return json.dumps(dct)
 
-
-
     @staticmethod
     def client_message(message):
         message = json.loads(message)

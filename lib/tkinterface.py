@@ -9,7 +9,7 @@ from .metaclass import SingletonType
 import asyncio
 import tkinter as tk
 import logging
-import mem_top
+import collections
 
 
 class AsyncInterface:
@@ -50,7 +50,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     def __init__(self, delegate=None, title=None, refreshrate=None):
         super().__init__(delegate)
         tk.Tk.__init__(self)
-
+        self.logger = logging.getLogger(f"main.{delegate.client_id}")
         if isinstance(title, str):
             self.wm_title(title)
         if refreshrate is None:
@@ -64,10 +64,13 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
             try:
                 update_task()
             except:
-                logging.getLogger("main.POS.gui.stderr").exception("")
+                logging.getLogger("main.POS.gui.stderr").exception(str(update_task.func))
                 self.update_tasks.remove(update_task)
         super().update()
 
+    def remove(self, func):
+        self.update_tasks.remove(func)
+    
     def add_task(self, task):
         self.tasks.append(self.loop.create_task(task))
 
@@ -97,25 +100,16 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
         self.loop.run_forever()
     
     def destroy(self, *args):
-        super().destroy()
         self.running = False
+        super().destroy()
         
     def __call__(self):
         self.mainloop()
-      
+
 def update(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        name = func.__name__
         function = partial(func, *args, **kwargs)
-        object.__setattr__(function, "__name__", name)
         AsyncTk().update_tasks.append(function)
+        return function
     return wrapper
-
-
-
-
-    
-    
-
-

@@ -244,6 +244,7 @@ class OrderInterface(MenuType, UserList, TicketType):
     def tax(self)->int:
         return self.total - self.subtotal
 
+
 class ToplevelType(type):
     """Centers toplevel window"""
 
@@ -278,6 +279,8 @@ class ToplevelWidget(MenuWidget, ToplevelType):
     
 class ReinstanceType(MenuWidget):
     objects = list()
+    null_method = lambda:None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.instance = None
@@ -291,14 +294,21 @@ class ReinstanceType(MenuWidget):
             original = self.instance
             grid_info = self.instance.grid_info()
             grid_info.pop("in")
-
+            # perform additional cleanup
+            if hasattr(original, "dtor"):
+                original.dtor()
+            
             self.instance = super().__call__(*args, **kwargs)
+            # perform additional initializations    
+            if hasattr(self.instance, "ctor"):
+                self.instance.ctor()
+     
             original.destroy()
             self.instance.grid(**grid_info)
             return self.instance
     
     @classmethod
-    def reinstance(cls, target=None):
+    def reinstance(cls, target=None):    
         if target is None:
             for cls, args, kwargs in cls.objects:
                 return cls(*args, **kwargs)

@@ -10,8 +10,7 @@ from .menu_editor import *
 from .price_display import PriceDisplay
 from .checkout_display import *
 from .network_status import NetworkStatus
-from .shutdown_button import *
-from .titlebar import titlebar
+from .titlebar import *
 from .progress_tab import *
 from .order import Order, NewOrder
 from .control_panel import *
@@ -47,9 +46,52 @@ class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
         self["Checkout"] = checkout_frame
         self["Processing"] = progress_frame
 
-        order_frame.update_order_list()
-        checkout_frame.update_order_list()
-        progress_frame.update_order_status()
+    def ctor(self):
+        self.update()
+    
+    def dtor(self):
+        for task in self.update_tasks:
+            lib.AsyncTk().remove(task)
+
+    def update(self):
+        self.update_tasks = (self["Orders"].update_order_list(),
+        self["Checkout"].update_order_list(),
+        self["Processing"].update_order_status())
+
+
+class Console(TabbedFrame, metaclass=WidgetType, device="POS"):        
+    tabfont = ("Courier", 10)
+    instance = None
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, "stdout", "stderr", "control panel", **kwargs)
+        style = ttk.Style(self)
+        style.configure("TNotebook.Tab", font=self.tabfont, padding=1)
+        style.configure("TNotebook", padding=-1)
+
+        stdout_scrollbar = tk.Scrollbar(self["stdout"])
+        stderr_scrollbar = tk.Scrollbar(self["stderr"])
+        
+        stdout_textbox = console_stdout(self["stdout"],
+                yscrollcommand=stdout_scrollbar.set)
+        stderr_textbox = console_stderr(self["stderr"], 
+                yscrollcommand=stderr_scrollbar.set)
+
+        stdout_scrollbar["command"] = stdout_textbox.yview
+        stderr_scrollbar["command"] = stderr_textbox.yview
+
+        self["stdout"].grid_columnconfigure(0, weight=1)
+        self["stderr"].grid_columnconfigure(0, weight=1)
+
+        stdout_textbox.grid(row=0, column=0, sticky="nswe")
+        stderr_textbox.grid(row=0, column=0, sticky="nswe")
+        stdout_scrollbar.grid(row=0, column=1, sticky="nse")
+        stderr_scrollbar.grid(row=0, column=1, sticky="nse")
+    
+        controlpanel = ControlPanel(self["control panel"])
+        controlpanel.add_mode_toggle(MenuDisplay, MenuEditor)
+        controlpanel.grid(sticky="nswe", pady=2, padx=2)
+        type(self).instance = self
 
 
 class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
@@ -82,24 +124,29 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
         self.controls.save.command = self.on_save
         self.controls.apply.command = self.on_apply
         self.controls.reset.command = self.on_reset
-        
+
+    def ctor(self):
         self.update()
 
-    @lib.update
+    def dtor(self):
+        lib.AsyncTk().remove(self.update_task)
+
     def update(self):
-        # remove empty tab
-        for category in self.category_editor.data:
-            frame = self.category_editor[category]
-            if frame.is_empty():
-                self.category_editor.pop(category).destroy()
-                self.category_config.pop(category).destroy()
-                return # next line will raise error since the frame is gone
+        @lib.update
+        def update():
+            # remove empty tab
+            for category in self.category_editor.data:
+                frame = self.category_editor[category]
+                if frame.is_empty():
+                    self.category_editor.pop(category).destroy()
+                    self.category_config.pop(category).destroy()
+                    return # next line will raise error since the frame is gone
 
-        category = self.category_editor.current()
-        self.item_adder.category = category
-        for widget in self.category_config.values():
-            widget.update(category)
-
+            category = self.category_editor.current()
+            self.item_adder.category = category
+            for widget in self.category_config.values():
+                widget.update(category)
+        self.update_task = update()
 
     def on_add_item(self, *args):
         result = self.item_adder.get()
@@ -124,47 +171,31 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
         messages = "\n".join(message for message in messages if message).strip()
         if messages:
             logging.getLogger("main.POS.gui.stdout").info(messages)
-        AsyncTk().forward("edit_menu", EditorDelegate().apply())
+        
+        EditorDelegate().apply()        
+        # QoL: lift console stdout tab
+        Console.instance.select("stdout")
         ReinstanceType.reinstance()
         self.on_reset()
 
     def on_save(self, *args):
-        logging.getLogger("main.POS.gui.stdout").info("Save: Not yet implemented")
-
+        messages = [config.apply().strip() for config in self.category_config.values()]
+        messages.append(self.category_editor.apply().strip())
+        messages = "\n".join(message for message in messages if message).strip()
+        if messages:
+            logging.getLogger("main.POS.gui.stdout").info(messages)
+        AsyncTk().forward("edit_menu", EditorDelegate().apply())
+        Console.instance.select("stdout")
+        ReinstanceType.reinstance()
+        self.on_reset()
+        
     def on_reset(self, *args):
         EditorDelegate().reset()
         ReinstanceType.reinstance(type(self))
 
 
-class Console(TabbedFrame, metaclass=WidgetType, device="POS"):        
-    tabfont = ("Courier", 10)
-    
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, "stdout", "stderr", "control panel", **kwargs)
-        style = ttk.Style(self)
-        style.configure("TNotebook.Tab", font=self.tabfont, padding=1)
-        style.configure("TNotebook", padding=-1)
-   
-        stdout_scrollbar = tk.Scrollbar(self["stdout"])
-        stderr_scrollbar = tk.Scrollbar(self["stderr"])
+            
+
+
+
         
-        stdout_textbox = console_stdout(self["stdout"],
-                yscrollcommand=stdout_scrollbar.set)
-        stderr_textbox = console_stderr(self["stderr"], 
-                yscrollcommand=stderr_scrollbar.set)
-
-        stdout_scrollbar["command"] = stdout_textbox.yview
-        stderr_scrollbar["command"] = stderr_textbox.yview
-
-        self["stdout"].grid_columnconfigure(0, weight=1)
-        self["stderr"].grid_columnconfigure(0, weight=1)
-
-        stdout_textbox.grid(row=0, column=0, sticky="nswe")
-        stderr_textbox.grid(row=0, column=0, sticky="nswe")
-        stdout_scrollbar.grid(row=0, column=1, sticky="nse")
-        stderr_scrollbar.grid(row=0, column=1, sticky="nse")
-    
-        mode_switch = ToggleMenuMode(self["control panel"], MenuDisplay, MenuEditor)
-        mode_switch.grid(row=0, column=0, sticky="nswe")
-        reinstance = lib.LabelButton(self["control panel"], text="Reinstance", width=12, bg="yellow", command=ReinstanceType.reinstance)
-        reinstance.grid(row=1, column=0, sticky="nswe")

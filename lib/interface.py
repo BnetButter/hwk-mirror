@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from abc import abstractmethod
 from collections import OrderedDict
+from collections import deque
 import time
 import websockets
 import json
@@ -11,13 +12,14 @@ import subprocess
 import sys
 import decimal
 import os
-
+import io
 
 from .data import address, device_ip, port, router_ip
 from .data import APPDATA
 from .data import ASCIITIME, LEVEL_NAME, MESSAGE
 from .data import GUI_STDOUT, GUI_STDERR
 from .globalstate import GlobalState
+from .tkinterface import AsyncTk
 
 logger = logging.getLogger("websockets")
 logger.setLevel(logging.INFO)
@@ -45,7 +47,6 @@ class Pointer:
         self._value = value
 
 
-
 class ServerInterface(GlobalState, metaclass=ABCMeta):
     loop = asyncio.get_event_loop()
     available_ports = {"7000", "8000", "9000"}
@@ -56,7 +57,6 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         self.order_queue = OrderedDict()
         self.ticket_no = 1
         self.shutdown_now = False
-        self.connected_clients = dict()
         self.coroutine = self.coroutine_switch()
 
     async def on_connect(self, ws, client_id) -> tuple:
@@ -84,7 +84,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
     async def on_disconnect(self, ws, client_id):
         """closes the server object"""
         try:
-            server, port = self.clients[client_id]
+            server, port = self.clients.pop(client_id)
         except KeyError:
             logger.warning(f"'{client_id}' is not connected")
             await ws.send(json.dumps({"result":False}))
@@ -108,10 +108,11 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
     
             elif request == "connect":
                 self.clients[client_id] = await self.on_connect(ws, client_id)
+                self.connected_clients = [client_id for client_id in self.clients]
     
             elif request == "disconnect":
                 await self.on_disconnect(ws, client_id)
-        
+                self.connected_clients = [client_id for client_id in self.clients]
             else:
                 await self.coroutine(ws, client_id, request, data)
     
@@ -132,12 +133,18 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
             "new_order":self.new_order,
             "global_shutdown":self.global_shutdown,
             "get_time": self.get_time,
-            "get_menu": self.get_menu,
+            "edit_menu": self.edit_menu,
             "modify_order": self.modify_order,
             "cancel_order":self.cancel_order,
+            "remove_completed":self.remove_completed,
+            "get_menu": self.get_menu,
         }
         display = {
-            "order_complete":self.order_complete
+            "order_complete":self.order_complete,
+            "set_ticket_status": self.set_ticket_status,
+            "set_order_status": self.set_order_status,
+            "set_item_status": self.set_item_status,
+
         }
 
         extern = {
@@ -169,9 +176,20 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         return task
     
     @abstractmethod
-    async def new_order(self, ws, client_message):
-        client_message = json.dumps({"result":client_message})
-        await ws.send(client_message)
+    async def new_order(self):
+        ...
+    
+    @abstractmethod
+    async def set_item_status(self):
+        ...
+    
+    @abstractmethod
+    async def set_order_status(self):
+        ...
+    
+    @abstractmethod
+    async def set_ticket_status(self):
+        ...
     
     @abstractmethod
     async def global_shutdown(self):
@@ -194,22 +212,27 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         ...
     
     @abstractmethod
+    async def edit_menu(self):
+        ...
+
+    @abstractmethod
     async def get_menu(self):
         ...
-    
-    
-    
 
+    @abstractmethod
+    async def remove_completed(self):
+        ...
 
 class ClientInterface(GlobalState):
-    
+
     def __init__(self, client_id):
         super().__init__()
         self.client_id = client_id
         self.loop = asyncio.get_event_loop()
         self.tasks = list()
-        self.shutdown_now = Pointer(False)
-        self._connected = None
+        self.shutdown_now = False
+        self.network = None
+        self.connected = None
         
         self.log = logging.getLogger(f"main.{self.client_id}.interface")
         self.log.setLevel(logging.WARNING)
@@ -224,13 +247,7 @@ class ClientInterface(GlobalState):
         async with websockets.connect(address) as ws:
             await ws.send(json.dumps({"client_id":self.client_id, "request":request, "data":data}))
             return json.loads(await ws.recv())["result"]
-    @property
-    def connected(self):
-        return self._connected
-    
-    @connected.setter
-    def connected(self, value):
-        self._connected = value
+
 
     def create_task(self, task):
         task = self.loop.create_task(task)
@@ -287,6 +304,20 @@ class ClientInterface(GlobalState):
                 await asyncio.sleep(5)
         coroutine()
     
+    def get_connection_status(self):
+        return self.network, self.connected, self.connected_clients
+    
+    def shutdown(self, cleanup=lambda: None, shutdown_system=False):
+        async def shutdown():
+            while True:
+                if self.shutdown_now:
+                    await asyncio.sleep(self.shutdown_now)
+                    cleanup()
+                    if shutdown_system:
+                        subprocess.call("shutdown -h now")
+                else:
+                    await asyncio.sleep(1/30)
+        self.loop.create_task(shutdown())
 
 class POSInterface(ClientInterface, metaclass=ABCMeta):
 
@@ -307,9 +338,6 @@ class POSInterface(ClientInterface, metaclass=ABCMeta):
     
     @abstractmethod
     def edit_menu(self):...
-    
-    @abstractmethod
-    def get_connection_status(self):...
 
     @abstractmethod
     def get_ticket_no(self):...
@@ -321,5 +349,18 @@ class POSInterface(ClientInterface, metaclass=ABCMeta):
     def get_order_status(self):...
 
 
+class DisplayInterface(ClientInterface):
+
+    def __init__(self):
+        super().__init__("Display")
     
+    @abstractmethod
+    def set_ticket_status(self):
+        ...
+    
+    @abstractmethod
+    def set_order_status(self):
+        ...
+    
+
     

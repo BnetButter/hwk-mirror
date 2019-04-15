@@ -4,6 +4,7 @@ from .directory import *
 from json import dump
 from json import load
 from .logger import *
+from .salesinfo import *
 
 try:
     with open(MENUPATH, "r") as fp:

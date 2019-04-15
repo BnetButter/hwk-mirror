@@ -2,6 +2,8 @@ from tkinter import ttk
 from functools import wraps, partial
 from collections import UserDict, UserList
 from io import StringIO
+from time import localtime, strftime
+
 import asyncio
 import tkinter as tk
 import logging
@@ -38,7 +40,9 @@ class LabelButton(tk.Label):
             command = self.null_cmd
         if relief is None:
             relief = tk.RAISED
-
+        
+        self.active_config = {"fg":"black", "relief":tk.RAISED}
+        self.disabled_config = {"fg":"grey26", "relief":tk.GROOVE}
         self.command = command
         self.configure(bd=2, relief=relief)
         self.bind("<Button-1>", self.on_click)
@@ -47,13 +51,11 @@ class LabelButton(tk.Label):
     
         
     def activate(self):
-        self["fg"] = "black"
-        self["relief"] = tk.RAISED
+        self.configure(**self.active_config)
         self._active = True
 
     def deactivate(self):
-        self["fg"] = "grey26"
-        self["relief"] = tk.GROOVE
+        self.configure(**self.disabled_config)
         self._active = False
     
     def on_click(self, *args):
@@ -158,7 +160,7 @@ class EntryPreset(EntryVariable):
 class ScrollFrame(tk.Frame):
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, highlightthickness=0,*kwargs)
+        super().__init__(parent, highlightthickness=0, **kwargs)
        
         vscrollbar = tk.Scrollbar(self, orient=tk.VERTICAL)
         vscrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -171,7 +173,6 @@ class ScrollFrame(tk.Frame):
         
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
-
 
         self.interior = interior = tk.Frame(canvas)
         self.interior_id = canvas.create_window(0, 0,
@@ -232,7 +233,7 @@ class TabbedFrame(tk.Frame):
         return self._notebook.tab(self._notebook.select(), "text")
     
     def select(self, key):
-        self._notebook.select(self._tab_ids[key])
+        self._notebook.select(self.data[key])
 
     def tab_id(self, key):
         return self._tab_ids[key]
@@ -387,3 +388,37 @@ class NumpadKeyboard(tk.Frame):
         self._target = value
         for key in Key.all_keys:
             key.target = value
+
+class StatusIndicator(ToggleSwitch):
+    
+    def __init__(self, parent, text, font=None, **kwargs):
+        if font is None:
+            font = ("Courier", 10)
+        super().__init__(parent, text,
+                config_true={"relief": tk.SUNKEN,"bg":"green3"},
+                config_false={"relief": tk.RAISED, "bg":"red"}, font=font, **kwargs)
+        self.state = False
+        self.disabled_config = {"fg":"black"}
+
+    def set(self, value:bool):
+        if value is None:
+            value = False
+        self.state = value
+
+
+class Clock(tk.Entry):
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent,
+            width=11,
+            state=tk.DISABLED,
+            disabledbackground="white",
+            disabledforeground="black",
+            relief=tk.RIDGE, **kwargs)
+        self._time = tk.StringVar(self)
+        self["textvariable"] = self._time
+    
+    async def update(self):
+        while True:
+            self._time.set(strftime("%I:%M:%S %p", localtime()))
+            await asyncio.sleep(1)

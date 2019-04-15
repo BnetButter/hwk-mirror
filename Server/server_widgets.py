@@ -1,7 +1,5 @@
 from lib import gettime
 from lib import WidgetType
-from lib import update
-from lib import AsyncTk
 from lib import LabelButton
 from tkinter import ttk
 from time import strftime, localtime
@@ -9,9 +7,6 @@ from functools import partial
 import tkinter as tk
 import subprocess
 import asyncio
-
-class TimeEntry(tk.Entry):
-    pass    
 
 class ServerTime(tk.Frame, metaclass=WidgetType, device="Server"):
     font = ("Courier", 14)
@@ -35,8 +30,6 @@ class ServerTime(tk.Frame, metaclass=WidgetType, device="Server"):
             await asyncio.sleep(1)
 
 symbol = lambda parent, symbol, **kwargs: tk.Label(parent, text=symbol, **kwargs)
-
-
 
 class TimeVariable(tuple):
 
@@ -78,10 +71,6 @@ class TimeVariable(tuple):
 
 class EditTime(tk.Frame, metaclass=WidgetType, device="Server"):
     font=("Courier", 12)
-    
-    
-    
-
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.variables = TimeVariable(self)
@@ -137,10 +126,10 @@ class EditTime(tk.Frame, metaclass=WidgetType, device="Server"):
     def ampm(self):
         return self.variables[5].get()
 
-class ServerFrame(tk.Frame):
-
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
+class ServerTimeApp(tk.Tk):
+    loop = asyncio.get_event_loop()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         current_time = ServerTime(self, bd=2)    
         current_time.grid(row=0, column=0, pady=5, padx=5, sticky="nswe")
         edittime = EditTime(self)
@@ -152,7 +141,22 @@ class ServerFrame(tk.Frame):
                         padx=5), font=current_time.font)
 
         button.grid(row=0, column=1, pady=5, padx=5, sticky="nswe")
-        confirm = LabelButton(self, text="Confirm", bg="green")
+        confirm = LabelButton(self, text="Confirm", bg="green", command=self.destroy)
         confirm.grid(row=2, column=0)
 
+        self.current_time = current_time
+
+    def mainloop(self):
+        async def mainloop():
+            while True:
+                self.update()
+                await asyncio.sleep(1/60)
         
+        self._mainloop = self.loop.create_task(mainloop())
+        self.loop.create_task(self.current_time.update_time())
+        self.loop.run_forever()
+    
+    def destroy(self):
+        self._mainloop.cancel()
+        self.loop.stop()
+        super().destroy()

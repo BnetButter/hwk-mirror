@@ -81,7 +81,7 @@ default_methods = {
 
 stdout = stringio()
 stderr = stringio()
-new_stream = stringio.set
+
 
 class StreamType(type):
 
@@ -96,4 +96,3 @@ class StreamType(type):
         if stream is None:
             stream = stdout
         self.stream = stream
-    
