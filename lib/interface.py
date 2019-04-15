@@ -18,7 +18,6 @@ from .data import address, device_ip, port, router_ip
 from .data import APPDATA
 from .data import ASCIITIME, LEVEL_NAME, MESSAGE
 from .data import GUI_STDOUT, GUI_STDERR
-from .globalstate import GlobalState
 from .tkinterface import AsyncTk
 
 logger = logging.getLogger("websockets")
@@ -29,22 +28,49 @@ handler.setFormatter(logging.Formatter(f"{ASCIITIME} - {LEVEL_NAME} - {MESSAGE}"
 logger.addHandler(handler)
 
 
-class Pointer:
-    __slots__ = ["_value"]
 
-    def __init__(self, value=None):
-        self._value = value
+class GlobalState:
+    """Base class containing global system variables"""
+    loop = asyncio.get_event_loop()
+    tasks = list()
+
+    __slots__ = ["ticket_no",
+                "order_queue", 
+                "connected_clients",
+                "requests",
+                "shutdown_now",
+                "client_id"]
     
-    def __repr__(self):
-        return str(self._value)
+    def __init__(self, client_id=None):
+        self.client_id = client_id
+        self.ticket_no = None
+        self.order_queue = None
+        self.requests = None        
+        self.connected_clients = None
+        self.shutdown_now = None
 
-    @property
-    def value(self):
-        return self._value
+    def loads(self, string):
+        result = json.loads(string)
+        self.ticket_no = result["ticket_no"]
+        self.order_queue = result["order_queue"]
+        self.requests = result["requests"]
+        self.connected_clients = result["connected_clients"]
+        self.shutdown_now = result["shutdown_now"]
 
-    @value.setter
-    def value(self, value):
-        self._value = value
+    def dumps(self):
+        dct = {
+            "ticket_no": self.ticket_no,
+            "order_queue": self.order_queue,
+            "requests": self.requests,
+            "connected_clients": self.connected_clients,
+            "shutdown_now": self.shutdown_now,
+            }
+        return json.dumps(dct)
+
+    @staticmethod
+    def client_message(message):
+        message = json.loads(message)
+        return message["client_id"], message["request"], message["data"]
 
 
 class ServerInterface(GlobalState, metaclass=ABCMeta):

@@ -3,7 +3,7 @@ from lib import GUI_STDERR, GUI_STDOUT, output_message
 from lib import APPDATA
 from lib import TicketType
 from lib import address, device_ip, router_ip
-from lib import POSInterface, Pointer
+from lib import POSInterface
 from lib import TICKET_QUEUED, TICKET_COMPLETE, TICKET_WORKING
 from lib import OrderInterface
 from POS import Order, NewOrder
