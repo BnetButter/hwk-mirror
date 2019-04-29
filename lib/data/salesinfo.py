@@ -25,6 +25,19 @@ class SalesInfo:
     
     def data(self):
         """returns a list of all items ordered"""
-        with open(self.filename, "a") as fp:
-            reader = csv.reader(fp)
-            return [eval(row[4]) for row in reader]
+        results = list()
+        with open(self.filename, "r") as fp:
+            reader = csv.DictReader(fp, fieldnames=self.headers)           
+            for dct in reader:
+                results.append(list(self.eval_csv(dct).values()))
+        return results
+    
+    @staticmethod
+    def eval_csv(dct):
+        dct["items"] = eval(dct["items"])
+        dct["timestamp"] = int(dct["timestamp"])
+        dct["total"] = int(dct["total"])
+        dct["subtotal"] = int(dct["subtotal"])
+        dct["tax"] = int(dct["tax"])
+        return dct
+

@@ -97,7 +97,6 @@ class Server(ServerInterface):
         self.loop.create_task(self.shutdown())
         
     async def edit_menu(self, ws, data):
-        print(data)
         with open(lib.MENUPATH, "w") as fp:
             json.dump(data, fp, indent=4)
             return await ws.send(json.dumps({"result":(True, None)}))
@@ -115,3 +114,7 @@ class Server(ServerInterface):
             if not self.clients:
                 self.loop.stop()
                 break
+    
+    async def extract(self, ws, data):
+        await ws.send(json.dumps({"result": self.salesinfo.data()}))
+ 

@@ -170,11 +170,12 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
             "set_ticket_status": self.set_ticket_status,
             "set_order_status": self.set_order_status,
             "set_item_status": self.set_item_status,
-
         }
 
         extern = {
+            "extract": self.extract
         }
+        
         switch = {
             "POS":pos,
             "Display":display,
@@ -247,6 +248,10 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
 
     @abstractmethod
     async def remove_completed(self):
+        ...
+    
+    @abstractmethod
+    async def extract(self):
         ...
 
 class ClientInterface(GlobalState):
