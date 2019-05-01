@@ -13,11 +13,10 @@ extern const void * const Arguments(void);
 extern const void * const KeywordArguments(void);
 extern const void * const StopIteration;
 
-typedef void * args_t[4];
-typedef void * kwargs_t[5];
 
-#define args(...)        *(args_t *)   new(Arguments(), (args_t) {}, ## __VA_ARGS__, StopIteration)
-#define kwargs(...)      *(kwargs_t *) new(KeywordArguments(), (kwargs_t) {}, ## __VA_ARGS__, StopIteration)
+
+#define args(...)       new(Arguments(), ## __VA_ARGS__, StopIteration)
+#define kwargs(...)     new(KeywordArguments(), ## __VA_ARGS__, StopIteration)
 #define ARGC_MAX         25
 
 extern int insert(void * self, uintptr_t location, const void * item);
@@ -27,4 +26,5 @@ extern long unsigned len(void * self);
 extern int clear(void * self);
 void append(void * self, void * item);
 
+size_t dict_keys(void * dct, const char ** buf);
 #endif

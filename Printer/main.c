@@ -68,8 +68,13 @@ void test_dict(void)
         results[i] = get(d, (uintptr_t) keys[i]);
         assert(results[i] == values[i]);
     }
-
     printf("get passed\n");
+
+    const char * buf[10];
+    int result = dict_keys(d, buf) == 3;
+    assert (result);
+    for (int i = 0; i < 3; i++)
+        printf("dict_key: %s\n", buf[i]);
 
     for (int i = 0; i < 3; i++) {
         assert(results[i] == pop(d, (uintptr_t) keys[i]));
@@ -135,18 +140,17 @@ void test_kwargs(void)
 void test_printer(void)
 {   
     printf("** test_printer **\n");
-    void * printer = new(Printer(), AdafruitPrinter);
+    void * printer = new(AdafruitPrinter(), "./testfile", "wb");
+    feed(printer, 10);
+    sleep(printer);
+    wake(printer);
+    write(printer, "hello\n");
+    write(printer, "this is a test\n");
 
 }
 
+
 int main(void)
 {
-    test_list();
-    test_dict();
-    test_args();
-    test_kwargs();
-
-    test_printer();
-
     return 0;
 }

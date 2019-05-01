@@ -2,7 +2,7 @@
 #include "object.h"
 #include "_iotype.h"
 
-
+typedef int (*write_c)(void *, int);
 
 static void * IOType_ctor(void * _self, va_list * app)
 {
@@ -41,6 +41,9 @@ static void * IOType_ctor(void * _self, va_list * app)
     return self;
 }
 
+/* calls virtual methods */
+
+
 int read(void * _self, char * buffer)
 {
     const struct IOType * class = type(_self);
@@ -48,11 +51,22 @@ int read(void * _self, char * buffer)
     return ((int (*)()) class->read.method)(_self, buffer);
 }
 
-int write(void * _self, const char * content)
+size_t write(void * _self, const char * content)
 {
     const struct IOType * class = type(_self);
-    assert(class->read.method);
-    return ((int (*)()) class->write.method)(_self, content);
+    assert(class->write.method && content);
+    size_t written = 0;
+    while (*content)
+        if (((write_c) class->write.method)(_self, *content ++)
+                != EOF)
+            written ++;
+    return written;
+}
+
+size_t writeline(void * _self, const char * line)
+{
+    size_t written = write(_self, line);
+    return written += write(_self, & (char) {'\n'});
 }
 
 int flush(void * _self)
@@ -68,7 +82,6 @@ int seek(void * _self, long offset, int origin)
     assert(class->seek.method);
     return ((int (*)())class->seek.method)(_self, offset, origin);
 }
-
 
 
 static const void * _IOType;

@@ -3,9 +3,10 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include "io.h"
+
 #include "printertype.h"
 #include "_adafruit.h"
+#include "iobase.h"
 
 
 #define BAUDRATE 19200
@@ -55,6 +56,9 @@ static void set_default(void *);
 /* va_arg sentinel */
 static long unsigned _StopIteration;
 
+/* properties */
+static const void * _config_dict;
+
 /* 
   singleton instance.
   one printer per device.
@@ -87,18 +91,16 @@ static void * AdafruitPrinter_ctor(void * _self, va_list * app)
     return self;
 }
 
-static void AdafruitPrinter_set_timeout(void * _self, long unsigned ms)
+static void AdafruitPrinter_set_timeout(void * _self, long unsigned microseconds)
 {
     struct AdafruitPrinter * self = _self;
-    self->resume_time = ms;
+    self->resume_time = microseconds;
 }
 
 static void AdafruitPrinter_wait_timeout(void * _self)
 {   
     struct AdafruitPrinter * self = _self;
-    long unsigned x = 0;
-    // RPI clocked at 1.4 ghz. close enough.
-    while (x++, x < self->resume_time);
+    delay(self->resume_time / 1000);
 }
 
 static void AdafruitPrinter_reset(void * _self)
@@ -145,9 +147,10 @@ static void AdafruitPrinter_sleep(void * _self)
 
 static void AdafruitPrinter_wake(void * _self)
 {
-  set_timeout(_self, 0);   // Reset timeout counter
-  write_bytes(_self, 255); // Wake
-  write_bytes(_self, ASCII_ESC, '8', 0, 0);
+    set_timeout(_self, 0);   // Reset timeout counter
+    write_bytes(_self, 255); // Wake
+    delay(50);
+    write_bytes(_self, ASCII_ESC, '8', 0, 0);
 }
 
 static void set_line_height(void * _self, uint8_t size)
@@ -159,78 +162,79 @@ static void set_line_height(void * _self, uint8_t size)
     write_bytes(self, ASCII_ESC, '3', size);
 }
 
-static void AdafruitPrinter_flush(void * _self) {write_bytes(_self, ASCII_FF);}
+static void AdafruitPrinter_flush(void * _self)
+{
+    write_bytes(_self, ASCII_FF);
+    super(AdafruitPrinter(), flush)(_self);
+}
 
-static void Adafruitvoidest_page(void * _self)
+static void Adafruittest_page(void * _self)
 {   
     struct AdafruitPrinter * self = _self;
     write_bytes(self, ASCII_DC2, 'T');
     set_timeout(self, self->dot_print_time * 24 * 26 + self->dot_feed_time * (6 * 26 + 30));
 }
 
-typedef void (*config_func)(void *, long unsigned);
-
-struct key_func 
+static void * AdafruitPrinter_configure(void * _self, const char * kwd)
 {
-    const char * key;
-    void (*func)();
-};
-
-
-#define func void (*)()
-
-static const struct key_func config[] = {
-    {JUSTIFY,       (func) set_justify},
-    {SIZE,          (func) set_size},
-    {NORMAL,        (func) set_normal},
-    {LINE_HEIGHT,   (func) set_line_height},
-    {INVERSE,       (func) set_inverse},
-    {UPSIDE_DOWN,   (func) set_upside_down},
-    {DOUBLE_HEIGHT, (func) set_double_height},
-    {DOUBLE_WIDTH,  (func) set_double_width},
-    {STRIKE,        (func) set_strike},
-    {BOLD,          (func) set_bold},
-    {UNDERLINE,     (func) set_underline},
-    {DEFAULT,       (func) set_default},
-    {ONLINE,        (func) set_online},
-};
-
-#undef func
-
-static void AdafruitPrinter_configure(void * _self, kwargs_t kwargs)
-{
-    struct AdafruitPrinter * self = _self;
-    reset(self);
-    for (int i = 0; i < sizeof(config) / sizeof(struct key_func); i++)
-        config[i].func(self, get(kwargs, (uintptr_t) config[i].key));
+    return get(_config_dict, (uintptr_t) kwd);
 }
 
+
+static int AdafruitPrinter_write(void * _self, char c)
+{
+    wait_timeout(_self);
+    int result = ((int (*)()) super(AdafruitPrinter(), write))(_self, c);
+    set_timeout(_self, BYTE_TIME);
+    return result;
+}
 
 
 static void _write_bytes(void * _self, ...)
 {   
     struct AdafruitPrinter * self = _self;
-    AdafruitPrinter_wait_timeout(self);
+    wait_timeout(self);
     va_list ap; va_start(ap, _self);
     long unsigned byte; 
     int n_bytes = 0;
+
     while ((byte = va_arg(ap, long unsigned) != (long unsigned) & _StopIteration))
-        n_bytes += write_char(self, byte);
-     
+        if(fputc(byte, ((struct IOBase *) (self))->stream)
+                != EOF)
+            n_bytes++;
+
     va_end(ap); 
-    AdafruitPrinter_set_timeout(self, n_bytes * BYTE_TIME);
+    set_timeout(self, n_bytes * BYTE_TIME);
 }
 
 static const void * _AdafruitPrinter;
 const void * const AdafruitPrinter(void)
-{
+{   
+
+    if (! _config_dict)
+        _config_dict = new(KeywordArguments(),
+            JUSTIFY, set_justify,
+            SIZE, set_size,
+            UNDERLINE, set_underline,
+            BOLD, set_bold,
+            STRIKE, set_strike,
+            DOUBLE_HEIGHT, set_double_height,
+            DOUBLE_WIDTH, set_double_width,
+            INVERSE, set_inverse,
+            UPSIDE_DOWN, set_upside_down,
+            DEFAULT, set_default,
+            NORMAL, set_normal,
+            LINE_HEIGHT, set_line_height,
+            ONLINE, set_online,
+            StopIteration);
+    
     return _AdafruitPrinter ? _AdafruitPrinter : (_AdafruitPrinter = new(
             PrinterType(), __func__,
             IOBase(), sizeof(struct AdafruitPrinter),
             new, AdafruitPrinter_new,
             reset, AdafruitPrinter_reset,
             flush, AdafruitPrinter_flush,
-            test_page, Adafruitvoidest_page,
+            test_page, Adafruittest_page,
             set_timeout, AdafruitPrinter_set_timeout,
             wait_timeout, AdafruitPrinter_wait_timeout,
             ctor, AdafruitPrinter_ctor,
@@ -238,6 +242,7 @@ const void * const AdafruitPrinter(void)
             sleep, AdafruitPrinter_sleep,
             feed, AdafruitPrinter_feed,
             configure, AdafruitPrinter_configure,
+            write, AdafruitPrinter_write,
             (void *) 0));
 }
 

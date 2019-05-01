@@ -282,6 +282,16 @@ const void * const dict(void)
         (void *) 0));
 }
 
+size_t dict_keys(void * _self, const char ** buf)
+{
+    struct dict * self = _self;
+    size_t keycount = 0;
+    for (int i =0; i < self->size; i++)
+        if (self->items[i] && self->items[i] != NULL_ITEM)
+            buf[keycount] = self->items[i]->key,
+            keycount ++;
+    return keycount;
+}
 
 static char * stringcopy(char * d, const char * s)
 {
@@ -430,35 +440,16 @@ const void * const Arguments(void)
 /* keyword arguments class */
 
 static const void * _KeywordArguments;
-static struct item * _items[ARGC_MAX];
-static size_t _size = ARGC_MAX;
-
-static void * KeywordArguments_new(const void * const _class, va_list * app)
-{
-    struct Object * result = va_arg(*app, void *);
-    memset(result, 0, ((const struct Type *) _class)->size);    
-    for (int i = 0; i < _size; i++)
-        if (_items[i] != NULL && _items[i] != NULL_ITEM)
-            del_item(_items[i]);
-    memset(_items, 0, _size);
-    result->class = _class;
-    return ctor(result, app);
-}
 
 static void * KeywordArguments_ctor(void * _self, va_list * app)
 {
     struct dict * self = _self;
-    self->base_size = DICT_BASE_SIZE;
-    self->size = _size;
-    self->items = _items;
-
+    super(KeywordArguments(), ctor)(_self, app);
     const char * key;
     while ((key = va_arg(*app, const char *))!= StopIteration)
-            dict_insert(self, (char *) key, va_arg(*app, void *));
+            insert(self, (char *) key, va_arg(*app, void *));
     return self;
 }
-
-static void * KeywordArguments_dtor(void * _self) {return NULL;}
 
 const void * const KeywordArguments(void)
 {
@@ -466,7 +457,5 @@ const void * const KeywordArguments(void)
             ArrayType(), "KeywordArguments",
             dict(), sizeof(struct dict),
             ctor, KeywordArguments_ctor,
-            dtor, KeywordArguments_dtor,
-            new, KeywordArguments_new,
             (void *) 0));
 }

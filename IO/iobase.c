@@ -7,16 +7,19 @@
 #include <stdlib.h>
 
 
-/* IOBase methods */
+/*  Since IOBase is meant to be subclassed,
+    these methods simply wraps stdio's functions.
+    ctor and dtor wraps fopen and fclose respectively.
+ */
+
 static void * IOBase_ctor(void * _self, va_list * app)
 {
     struct IOBase * self = _self;
-    // no need to call super.ctor
     const char * path = va_arg(*app, const char *);
     const char * mode = va_arg(*app, const char *);
     self->stream = fopen(path, mode);
     if (! self->stream)
-        raise(1);
+        raise(2);
     return self;
 }
 
@@ -27,11 +30,10 @@ static void * IOBase_dtor(void * _self)
     return self;
 }
 
-
-static int IOBase_write(void * _self, const char * content)
+static int IOBase_write(void * _self, int c)
 {
     struct IOBase * self =  _self;
-    return fwrite(content, 1, strlen(content), self->stream);
+    return fputc(c, self->stream);
 }
 
 static size_t IOBase_read(void * _self, char * buf)
@@ -40,10 +42,24 @@ static size_t IOBase_read(void * _self, char * buf)
     fseek(self->stream, 0, SEEK_END);
     size_t size = ftell(self->stream) + 1;
     rewind(self->stream);
-    buf = malloc(size);
-    if (buf)
+
+    if (! buf)
+        buf = malloc(size);
+    if (buf) // check malloc
         return fread(buf, 1, size, self->stream);
     return 0;
+}
+
+static int IOBase_flush(void * _self)
+{
+    struct IOBase * self = _self;
+    return fflush(self->stream);
+}
+
+static int IOBase_seek(void * _self, size_t offset, int origin)
+{
+    struct IOBase * self = _self;
+    return fseek(self->stream, offset, origin);
 }
 
 static const void * _IOBase;
@@ -56,5 +72,7 @@ const void * const IOBase(void)
         dtor, IOBase_dtor,
         read, IOBase_read,
         write, IOBase_write,
+        seek, IOBase_seek,
+        flush, IOBase_flush,
         (void *)0));
 }

@@ -36,11 +36,17 @@ const void * const Printer(void)
     (void *) 0));
 }
 
+int print(void * _self, const char * string, void * string_config)
+{
+    return 0;
+}
 
-int printline(void * _self, const char * line, kwargs_t line_configuration)
+int printline(void * _self, const char * line, void * line_configuration)
 {
     CAST;
-    configure(self->delegate, line_configuration);
-    write(self->delegate, line);
+    const char * key_buf[50];
+    size_t n_keys = dict_keys(line_configuration, key_buf);
+    for (int i = 0; i < n_keys; i++)
+        ((void (*)(void *, int)) configure(self->delegate, key_buf[i]))(self->delegate, key_buf[i]);
 }
 
