@@ -7,10 +7,12 @@ from lib import POSInterface
 from lib import TICKET_QUEUED, TICKET_COMPLETE, TICKET_WORKING
 from lib import OrderInterface
 from POS import Order, NewOrder
+import collections
 import lib
 import decimal
 from operator import itemgetter
 from time import localtime, strftime
+from Printer import Printer
 import contextvars
 import websockets
 import asyncio
@@ -20,14 +22,22 @@ import functools
 import subprocess
 import os
 
+
+
+# not yet implemented
+def print_receipt(line, **kwargs):
+    print(line, kwargs)
+
 class POSProtocol(POSInterface):
 
+    
     def __init__(self):
         super().__init__()
         self.network = False
         self.connected = False
         self.test_network_connection()
         self.connect_task = self.connect()
+        self.receipt_printer = Printer("/dev/null")
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
         self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
 
@@ -50,10 +60,21 @@ class POSProtocol(POSInterface):
             ticket_no = task.result()
             ticket_no = "{:03d}".format(ticket_no)
             self.stdout.info(f"Received ticket no. {ticket_no}")
-            # TODO log to sales.csv
-            NewOrder()
 
+            
+            lines_conf = [(ticket_no, Order().printer_style["ticket_no"])]
+
+            for order in Order():
+                lines_conf.extend(order.receipt())
+
+            lines_conf.append(("Total: " + "$ {:.2f}".format(Order().total / 100), 
+                    Order().printer_style["total"]))
+            
+            for line in lines_conf:
+                self.receipt_printer.writeline(line[0], **line[1]) 
+            NewOrder()
         task.add_done_callback(callback)
+          
             
     def cancel_order(self, ticket_no):
         task = self.loop.create_task(self.server_message("cancel_order", ticket_no))
@@ -199,3 +220,5 @@ class POSProtocol(POSInterface):
         order_dct["subtotal"] = subtotal
         order_dct["tax"] = tax    
         return order_dct
+    
+    

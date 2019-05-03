@@ -1,43 +1,41 @@
-#include "printer.h"
-#include "io.h"
-#include "adafruit.h"
+#include <stdlib.h>
+#include "adafruit/printer.h"
 
-const char * lines[] = {
-        "001",
-        "Hamburger", 
-        "    + Lettuce",
-        "    + Onions",
-        "    + Tomatoes",
-        "    + Lettuce",
-        "  FrenchFries",
-        "  Coffee",
-        "    + Large"
-        "Total: 7.45"};
+
+struct printer * Printer(void)
+{
+    struct printer * p = calloc(1, sizeof(struct printer));
+    printer_ctor(p, "/dev/serial0");
+    return p;
+}
+
+#define writeline(self, line, ...) \
+        printer_writeline(self, line, (struct line_option ) {\
+        .justify='L', .bold=0, .underline=0, .size='S', __VA_ARGS__})
 
 
 int main(void)
 {
-    void * printer = new(Printer(), AdafruitPrinter);
-    printline(printer, lines[0], kwargs(
-        "justify", 'C',
-        "size",    'L',
-        "bold",    true));
-    
-    printline(printer, lines[1], kwargs(
-        "size", 'M',
-        "underline", true));
-    
-    for (int i = 0; i < 4; i++) 
-        printline(printer, lines[i + 2], kwargs("underline", false));
-    
-    printline(printer, lines[6], kwargs(
-        "size", 'M',
-        "underline", false));
-    
-    printline(printer, lines[7], kwargs("size", 'M'));
-    printline(printer, lines[8], kwargs("size", 'S'));
-    printline(printer, lines[9], kwargs(
-        "justify", 'C',
-        "size", 'L'));
-    delete(printer);
+    const char * receipt[] = {
+        "001",
+        "Cheeseburger",
+        "    + Onions",
+        "    + Lettuce",
+        "    + Tomatoes",
+        "    + Pickles",
+        "  French Fries",
+        "  Coffee",
+        "    + Large",
+        "Total: $00.00",
+    };
+
+    struct printer * p = Printer();
+    writeline(p, receipt[0], .size='L', .bold=1, .justify='C');
+    writeline(p, receipt[1], .size='M');
+    for (int i = 0; i < 4; i++)
+        writeline(p, receipt[2 + i]);
+    for (int i = 0; i < 2; i++)
+        writeline(p, receipt[6 + i], .size='M');
+    writeline(p, receipt[8]);
+    writeline(p, receipt[9], .size='L', .justify='C');
 }

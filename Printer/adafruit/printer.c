@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <time.h>
+#include <pthread.h>
+#include "printer.h"
 
 #define BAUDRATE 19200
 #define BYTE_TIME (((11L * 1000000L) + (BAUDRATE / 2)) / BAUDRATE)
@@ -15,92 +18,42 @@
 #define ASCII_FS   28  // Field separator
 #define ASCII_GS   29  // Group separator
 
-typedef struct _printer
-{
-    FILE * stream;
-    uint8_t print_mode;
-    uint8_t prev_byte;
-    uint8_t column;
-    uint8_t max_column;
-    uint8_t max_height;
-    uint8_t max_chunk_height;
-    uint8_t char_height;
-    uint8_t line_spacing;
-    unsigned long resume_time;
-    unsigned long dot_print_time;
-    unsigned long dot_feed_time;
-} printer_t;
-
-struct _writer_args {
-    char justify;
-    char size;
-    char bold;
-    uint8_t underline;
-};
-
-size_t printer_write(printer_t * self, const char * contents, size_t nchar, struct _writer_args);
-printer_t * Printer(const char * serial); // Printer("/dev/serial0")
-void printer_delete(printer_t *);
-void wait_timeout(printer_t *);
-void feed_line(printer_t *, uint8_t lines);
-void feed_rows(printer_t *, uint8_t rows);
-void flush(printer_t *);
-void reset(printer_t *);
-void sleep(printer_t *);
-void sleep_after(printer_t *, uint16_t seconds);
-void wake(printer_t *);
-void tab(printer_t *);
-void set_justify(printer_t *, char value);
-void set_size(printer_t * self, char value);
-void set_line_height(printer_t *, uint8_t x);
-void set_timeout(printer_t *, long unsigned x);
-void set_times(printer_t *, long unsigned print_time, long unsigned feed_time);
-void set_inverse(printer_t *, bool);
-void set_upside_down(printer_t *, bool);
-void set_double_height(printer_t *, bool);
-void set_double_width(printer_t *, bool);
-void set_strike(printer_t *, bool);
-void set_bold(printer_t *, bool);
-void set_underline(printer_t *, uint8_t);
-void set_online(printer_t *, bool);
-void set_default(printer_t *);
-
-static int write_bytes(printer_t *, ...);
+static int write_bytes(struct printer *, ...);
 
 /* va_arg sentinel */
 static long unsigned _StopIteration = 0;
 const void * StopIteration = & _StopIteration;
 
-#define write_char(self, c) (fwrite(& c, 1, 1, ((printer_t *) (self))->stream))
+#define write_char(self, c) (fwrite(& c, 1, 1, ((struct printer *) (self))->stream))
 
-static void printer_ctor(printer_t * self, const char * serial) 
+void printer_ctor(struct printer * self, const char * serial) 
 {
     self->stream = fopen(serial, "wb");
     set_timeout(self, 500000L);
     wake(self);
     reset(self);
-    
-    // write_bytes(11, heat_time?? 40, StopIteration);
-
     self->dot_print_time = 30000;
     self->dot_feed_time = 2100;
     self-> max_chunk_height = 255;
 }
-static void * printer_dtor(printer_t * self) {fclose(self->stream); return self;}
 
-printer_t * Printer(const char * serial)
+void printer_dtor(struct printer * self) 
 {
-    printer_t * result = calloc(1, sizeof(printer_t));
-    printer_ctor(result, serial);
-    return result;
+    fclose(self->stream);
 }
 
-void printer_delete(printer_t * self)
+void delay(long unsigned ms)
 {
-    free(printer_dtor(self));
+    ms /= 10;
+    long unsigned diff, start;
+    start = clock();
+    do {
+        diff = ((clock() - start) * 100) / CLOCKS_PER_SEC;
+    } while (diff < ms);
 }
 
-static int write_bytes(printer_t * self, ...)
+
+static int write_bytes(struct printer * self, ...)
 {
     wait_timeout(self);
     va_list ap; va_start(ap, self);
@@ -114,12 +67,12 @@ static int write_bytes(printer_t * self, ...)
     return n_bytes;
 }
 
-static size_t _printer_write(printer_t * self, char c)
+int printer_write(struct printer * self, char c)
 {   
-    size_t result;
+    int result = 0;
     if (c != 0x13) {
         wait_timeout(self);
-        result = write_char(self, c);
+        result = fputc((int) c, self->stream);
         long unsigned d = BYTE_TIME;
         if (c != '\n' 
                 || self->column == self->max_column) {
@@ -137,41 +90,43 @@ static size_t _printer_write(printer_t * self, char c)
         set_timeout(self, d);
         self->prev_byte = c;
     }
-    return 1;
+    return (result != EOF);
 }
 
-size_t printer_write(printer_t * self, const char * content, size_t size, struct _writer_args argv)
+
+
+size_t printer_writeline(struct printer * self, const char * line, struct line_option conf)
 {
-    set_justify(self, argv.justify);
-    set_bold(self, argv.bold);
-    set_underline(self, argv.underline);
-    set_size(self, argv.size);
-    size_t counter;
-    for (size_t i = 0;i < size; i++)
-        counter += _printer_write(self, *content++);
+    set_justify(self, conf.justify);
+    set_bold(self, conf.bold);
+    set_underline(self, conf.underline);
+    set_size(self, conf.size); // must be last
+
+    size_t result = 0;
+    while (*line)
+        result += printer_write(self, *line ++);
     feed_line(self, 1);
     reset(self);
-    return counter;
+    return result;
 }
 
-void set_times(printer_t * self, long unsigned p, long unsigned f)
+void set_times(struct printer * self, long unsigned p, long unsigned f)
 {   
     self->dot_print_time = p;
     self->dot_feed_time = f;
 }
 
-void set_timeout(printer_t * self, long unsigned x)
+void set_timeout(struct printer * self, long unsigned x)
 {
     self->resume_time = x;
 }
 
-void wait_timeout(printer_t * self)
+void wait_timeout(struct printer * self)
 {   
-    long unsigned x = 0;
-    while (x < self->resume_time, x ++);
+    delay(self->resume_time / 1000);
 }
 
-void reset(printer_t * self)
+void reset(struct printer * self)
 {
     write_bytes(self, ASCII_ESC, '@', StopIteration);
     self->prev_byte = '\n';
@@ -185,7 +140,7 @@ void reset(printer_t * self)
     write_bytes(self, 20, 24, 28, 0, StopIteration);
 }
 
-void test_page(printer_t * self)
+void test_page(struct printer * self)
 {
     write_bytes(self, ASCII_DC2, 'T', StopIteration);
     set_timeout(self, self->dot_print_time * 24 * 26 + self->dot_feed_time * (6 * 26 + 30));
@@ -202,7 +157,7 @@ void test_page(printer_t * self)
 
 
 
-static void write_print_mode(printer_t * self)
+static void write_print_mode(struct printer * self)
 {
     write_bytes(self,
             ASCII_ESC,
@@ -211,7 +166,7 @@ static void write_print_mode(printer_t * self)
             StopIteration);
 }
 
-static void set_print_mode(printer_t * self, uint8_t mask)
+static void set_print_mode(struct printer * self, uint8_t mask)
 {
     self->print_mode |= mask;
     write_print_mode(self);
@@ -219,7 +174,7 @@ static void set_print_mode(printer_t * self, uint8_t mask)
     self->max_column = (self->print_mode & DOUBLE_WIDTH_MASK) ? 16 : 32;
 }
 
-static void unset_print_mode(printer_t * self, uint8_t mask)
+static void unset_print_mode(struct printer * self, uint8_t mask)
 {
     self->print_mode &= mask;
     write_print_mode(self);
@@ -227,7 +182,7 @@ static void unset_print_mode(printer_t * self, uint8_t mask)
     self->max_column = (self->print_mode & DOUBLE_WIDTH_MASK) ? 16 : 32;
 }
 
-void set_normal(printer_t * self)
+void set_normal(struct printer * self)
 {
     self->print_mode = 0;
     write_print_mode(self);
@@ -236,42 +191,42 @@ void set_normal(printer_t * self)
 static void * set_unset[] = {unset_print_mode, set_print_mode};
 #define set_unset(self, value, mask) ((void (*)()) set_unset[value])(self, mask);
 
-void set_upside_down(printer_t * self, bool value) {set_unset(self, value, UPDOWN_MASK);}
+void set_upside_down(struct printer * self, bool value) {set_unset(self, value, UPDOWN_MASK);}
 
-void set_inverse(printer_t * self, bool value) { set_unset(self, value, INVERSE_MASK);}
+void set_inverse(struct printer * self, bool value) { set_unset(self, value, INVERSE_MASK);}
 
-void set_double_height(printer_t * self, bool value) {set_unset(self, value, DOUBLE_HEIGHT_MASK);}
+void set_double_height(struct printer * self, bool value) {set_unset(self, value, DOUBLE_HEIGHT_MASK);}
 
-void set_double_width(printer_t * self, bool value) {set_unset(self, value, DOUBLE_WIDTH_MASK);}
+void set_double_width(struct printer * self, bool value) {set_unset(self, value, DOUBLE_WIDTH_MASK);}
 
-void set_strike(printer_t * self, bool value) {set_unset(self, value, DOUBLE_WIDTH_MASK);}
+void set_strike(struct printer * self, bool value) {set_unset(self, value, DOUBLE_WIDTH_MASK);}
 
-void set_bold(printer_t * self, bool value) {set_unset(self, value, BOLD_MASK);}
+void set_bold(struct printer * self, bool value) {set_unset(self, value, BOLD_MASK);}
 
-void set_underline(printer_t * self, uint8_t weight) {write_bytes(self, ASCII_ESC, '-', weight, StopIteration);}
+void set_underline(struct printer * self, uint8_t weight) {write_bytes(self, ASCII_ESC, '-', weight, StopIteration);}
 
-void set_online(printer_t * self, bool value) {write_bytes(self, ASCII_ESC, '=', value, StopIteration);}
+void set_online(struct printer * self, bool value) {write_bytes(self, ASCII_ESC, '=', value, StopIteration);}
 
-void set_char_spacing(printer_t * self, int value) {write_bytes(self, ASCII_ESC, ' ', value);}
+void set_char_spacing(struct printer * self, int value) {write_bytes(self, ASCII_ESC, ' ', value);}
 
-void set_max_chunk_height(printer_t * self, int value) {self->max_chunk_height = value;}
+void set_max_chunk_height(struct printer * self, int value) {self->max_chunk_height = value;}
 
 
-void set_charset(printer_t * self, uint8_t value) 
+void set_charset(struct printer * self, uint8_t value) 
 {
     if (value > 15) 
         value = 15;
     write_bytes(self, ASCII_ESC, 'R', value, StopIteration);
 }
 
-void set_code_page(printer_t * self, uint8_t value)
+void set_code_page(struct printer * self, uint8_t value)
 {
     if (value > 47) 
         value = 47;
     write_bytes(self, ASCII_ESC, 't', value, StopIteration);
 }
 
-void set_justify(printer_t * self, char value)
+void set_justify(struct printer * self, char value)
 {
     uint8_t pos = 0;
     switch (value) {
@@ -289,7 +244,7 @@ void set_justify(printer_t * self, char value)
     write_bytes(self, ASCII_ESC, 'a', pos, StopIteration);
 }
 
-void set_default(printer_t * self)
+void set_default(struct printer * self)
 {
     set_online(self, true);
     set_justify(self, 'L');
@@ -302,17 +257,17 @@ void set_default(printer_t * self)
 }
 
 
-void sleep_after(printer_t * self, uint16_t seconds)
+void sleep_after(struct printer * self, uint16_t seconds)
 {
     write_bytes(self, ASCII_ESC, '8', seconds, seconds >> 8, StopIteration);
 }
 
-void sleep(printer_t * self)
+void printer_sleep(struct printer * self)
 {
     sleep_after(self, 1);
 }
 
-void wake(printer_t * self)
+void wake(struct printer * self)
 {
     set_timeout(self, 0);
     write_bytes(self, 255, StopIteration);
@@ -324,7 +279,7 @@ void wake(printer_t * self)
     }
 }
 
-void feed_line(printer_t * self, uint8_t x) 
+void feed_line(struct printer * self, uint8_t x) 
 {
     write_bytes(self, ASCII_ESC, 'd', x, StopIteration);
     set_timeout(self, (self->dot_feed_time * self->char_height));
@@ -332,7 +287,7 @@ void feed_line(printer_t * self, uint8_t x)
     self->column = 0;
 }
 
-void feed_rows(printer_t * self, uint8_t rows)
+void feed_rows(struct printer * self, uint8_t rows)
 {
     write_bytes(self, ASCII_ESC, 'J', rows, StopIteration);
     set_timeout(self, (rows * self->dot_feed_time));
@@ -340,12 +295,12 @@ void feed_rows(printer_t * self, uint8_t rows)
     self->column = 0;
 }
 
-void flush(printer_t * self)
+void printer_flush(struct printer * self)
 {
     write_bytes(self, ASCII_FF, StopIteration);
 }
 
-void set_size(printer_t * self, char value)
+void set_size(struct printer * self, char value)
 {
     uint8_t size;
     switch (value) {
@@ -373,7 +328,7 @@ void set_size(printer_t * self, char value)
     self->prev_byte = '\n';
 }
 
-void set_line_height(printer_t * self, uint8_t value)
+void set_line_height(struct printer * self, uint8_t value)
 {
     if (value < 24)
         value = 24;
@@ -381,7 +336,7 @@ void set_line_height(printer_t * self, uint8_t value)
     write_bytes(self, ASCII_ESC, '3', value, StopIteration);
 }
 
-void tab(printer_t * self)
+void tab(struct printer * self)
 {
     write_bytes(self, ASCII_TAB, StopIteration);
 }
