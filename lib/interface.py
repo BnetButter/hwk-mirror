@@ -170,6 +170,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
             "set_ticket_status": self.set_ticket_status,
             "set_order_status": self.set_order_status,
             "set_item_status": self.set_item_status,
+            "set_ticket_printed": self.set_ticket_printed
         }
 
         extern = {
@@ -252,6 +253,10 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
     
     @abstractmethod
     async def extract(self):
+        ...
+
+    @abstractmethod
+    async def set_ticket_printed(self):
         ...
 
 class ClientInterface(GlobalState):

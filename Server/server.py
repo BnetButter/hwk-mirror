@@ -14,19 +14,36 @@ class Server(ServerInterface):
 
     async def new_order(self, ws, data):
         self.order_queue[self.ticket_no] = data
+        data["print"] = lib.PRINT_NEW # cooks line ticket printer flag
         await ws.send(json.dumps({"result":self.ticket_no}))
         self.ticket_no += 1
     
+    async def set_ticket_printed(self, ws, data):
+        ticket = self.order_queue[int(data)]
+        ticket["print"] = False
+        await ws.send(json.dumps({"result": (True, None)}))
+
     async def cancel_order(self, ws, data):
-        ticket = self.order_queue.pop(data)
-        await ws.send(json.dumps({"result":ticket}))
+        # set order status as complete
+        parameters = operator.itemgetter(5)
+        for ticket in self.order_queue[data]["items"]:
+            parameters(ticket[:6])["status"] = lib.TICKET_COMPLETE
+            parameters(ticket[6])["status"] = lib.TICKET_COMPLETE
+            parameters(ticket[7])["status"] = lib.TICKET_COMPLETE
         
+        ticket = self.order_queue[data]
+        await ws.send(json.dumps({"result":ticket}))
+        self.order_queue[data]["print"] = lib.PRINT_NUL
+        await asyncio.sleep(5)
+        self.order_queue.pop(data)
+    
     async def modify_order(self, ws, data):
         ticket_no, modified = data
         if ticket_no not in self.order_queue:
             await ws.send(json.dumps({"result":(False, f"ticket no. {ticket_no} does not exist")}))
         else:
             self.order_queue[ticket_no] = modified
+            self.order_queue[ticket_no]["print"] = lib.PRINT_MOD
             await ws.send(json.dumps({"result":(True, None)}))
 
     async def set_ticket_status(self, ws, data):
@@ -117,4 +134,5 @@ class Server(ServerInterface):
     
     async def extract(self, ws, data):
         await ws.send(json.dumps({"result": self.salesinfo.data()}))
- 
+
+    

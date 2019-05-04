@@ -1,9 +1,12 @@
+from Printer import Printer
 import lib
 import logging
 import json
 import websockets
 import operator
 import asyncio
+
+
 
 
 NUM_TICKETS = 5
@@ -25,6 +28,16 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
     def is_queued(self):
         return all(value == lib.TICKET_QUEUED for value in self.status)
 
+    def ticket_receipt(self, status, n_ticket):
+        if status == lib.PRINT_NEW:
+            status = "\n"
+        elif status == lib.PRINT_MOD:
+            status = "MODIFIED TICKET"
+        elif status == lib.PRINT_NUL:
+            status = "CANCELED"
+        
+        header = "{:03d} ({}/{})".format(self.ticket_no, self.index[1] + 1, n_ticket)
+        return header + "\n" + status
 
     @property
     def status(self):
@@ -42,20 +55,28 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
     def ticket_no(self):
         return self.index[0]
 
+    def get_lines(self):
+        ...
+
     get = operator.itemgetter
     addon1 = property(get(6))
     addon2 = property(get(7))
     index = property(get(8))
 
+
 class DisplayProtocol(lib.DisplayInterface):
     
     def __init__(self):
         super().__init__()
+        self.ticket_printer = Printer("/dev/null")
+        self.ticket_generator = None
         self.network = False
         self.connected = False
         self.test_network_connection()
         self.connect()
+        self.print_tickets()
         self.show_num_tickets = NUM_TICKETS
+
 
     def tickets(self):
         if self.order_queue is None:
@@ -73,7 +94,13 @@ class DisplayProtocol(lib.DisplayInterface):
             OrderIndex(ticket, int(ticket_no), i)
             for ticket_no in result["order_queue"]
                 for i, ticket in enumerate(result["order_queue"][ticket_no]["items"])]
-    
+
+        self.ticket_generator = ((ticket, 
+                result["order_queue"][str(ticket.ticket_no)]["print"],
+                len(result["order_queue"][str(ticket.ticket_no)]["items"]))
+                for ticket in self.order_queue
+                    if result["order_queue"][str(ticket.ticket_no)]["print"])
+
     def set_ticket_status(self, index, value):
         """set status of one ticket status to value"""
         data = index[0], index[1], value
@@ -85,3 +112,35 @@ class DisplayProtocol(lib.DisplayInterface):
         data = ticket_no, value
         return self.loop.create_task(self.server_message("set_order_status", data))
     
+    def print_tickets(self):      
+        
+        async def not_none():
+            while True:
+                if self.ticket_generator is not None:
+                    return
+                await asyncio.sleep(1/30)
+
+        async def _print_tickets():
+            while True:
+                ticket_no = set()
+                for ticket in self.ticket_generator:
+                    ticket, status, cnt = ticket
+                    ticket_no.add(ticket.ticket_no)
+                    print(ticket.ticket_receipt(status, cnt))
+
+                    await asyncio.sleep(1)
+                         
+                for ticket in ticket_no:
+                    await self.server_message("set_ticket_printed", ticket)
+
+                await asyncio.sleep(1/30)
+
+        def print_tickets(task):
+            self.loop.create_task(_print_tickets())
+
+        # wait for server update
+        task = self.loop.create_task(not_none())
+        
+        # start print_ticket loop
+        task.add_done_callback(print_tickets)
+        

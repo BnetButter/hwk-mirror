@@ -459,7 +459,7 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
 
         else:
             self.modify_button.activate()
-            self.modify_button.activate()
+            self.cancel_button.activate()
         
         if self.editor.grid_info().get("in") != self:
             self.confirm_modify.lower()
