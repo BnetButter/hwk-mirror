@@ -105,6 +105,15 @@ static PyObject * Printer_set_size(PrinterObject * self, PyObject * args)
     Py_RETURN_NONE;
 }
 
+static PyObject * Printer_feed(PyObject * self, PyObject * args)
+{
+    int line;
+    if (! PyArg_Parsetuple(args, "i:feed", & line))
+        return NULL;
+    feed_line(cast(self), (uint8_t) line);
+    Py_RETURN_NONE;
+}
+
 static PyObject * Printer_set_justify(PrinterObject * self, PyObject * args)
 {
     char justify;
@@ -141,6 +150,7 @@ static PyMethodDef Printer_methods[] = {
     {"set_justify", Printer_set_justify, METH_VARARGS, NULL},
     {"set_underline", Printer_set_justify, METH_VARARGS, NULL},
     {"writeline", Printer_writeline, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"feed", Printer_writeline, METH_VARARGS, NULL},
     {NULL,              NULL}           /* sentinel */
 };
 

@@ -54,7 +54,6 @@ class POSProtocol(POSInterface):
         order_dct["payment_type"] = payment_type
         order_dct["cash_given"] = cash_given
         order_dct["change_due"] = change_due
-        
         task = self.loop.create_task(self.server_message("new_order", order_dct))
         def callback(task):
             ticket_no = task.result()
