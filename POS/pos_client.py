@@ -22,12 +22,6 @@ import functools
 import subprocess
 import os
 
-
-
-# not yet implemented
-def print_receipt(line, **kwargs):
-    print(line, kwargs)
-
 class POSProtocol(POSInterface):
 
     
