@@ -10,6 +10,15 @@ import asyncio
 
 
 NUM_TICKETS = 5
+NULL_OPT = {}
+HEADER_OPT = {
+        "bold":bytes(1), 
+        "size":bytes("L", "utf-8"),
+        "justify": bytes("C", "utf-8")}
+
+ITEM_OPT = {
+        "size": bytes("M", "utf-8")}
+
 
 class OrderIndex(tuple, metaclass=lib.TicketType):
     """OrderIndex(ticket, ticket_no, nth_ticket)"""
@@ -30,14 +39,31 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
 
     def ticket_receipt(self, status, n_ticket):
         if status == lib.PRINT_NEW:
-            status = "\n"
+            status = "NEW TICKET", HEADER_OPT
         elif status == lib.PRINT_MOD:
-            status = "MODIFIED TICKET"
+            status = "MODIFIED TICKET", HEADER_OPT
         elif status == lib.PRINT_NUL:
-            status = "CANCELED"
+            status = "CANCELED TICKET", HEADER_OPT
+        lines = list()      
+        header =  "{:03d} ({}/{})".format(
+                    self.ticket_no, self.index[1] + 1, n_ticket), HEADER_OPT
+
+        if not self.parameters.get("register"): # pylint: disable=E1101
+            lines.append((self.name, ITEM_OPT)) # pylint: disable=E1101
+            lines.extend(("  + " + option, NULL_OPT) for option in self.selected_options) # pylint: disable=E1101
         
-        header = "{:03d} ({}/{})".format(self.ticket_no, self.index[1] + 1, n_ticket)
-        return header + "\n" + status
+        if not self.addon1.parameters.get("register"):
+            lines.append(("  " + self.addon1.name, ITEM_OPT))
+            lines.extend(("    + " + option, NULL_OPT) for option in self.addon1.selected_options)
+        
+        if not self.addon2.parameters.get("register"):
+            lines.append(("  " + self.addon2.name, ITEM_OPT))
+            lines.extend(("    + " + option, NULL_OPT) for option in self.addon2.selected_options)
+        
+        if lines:
+            lines.insert(0, status)
+            lines.insert(0, header)
+        return lines
 
     @property
     def status(self):
@@ -126,10 +152,16 @@ class DisplayProtocol(lib.DisplayInterface):
                 for ticket in self.ticket_generator:
                     ticket, status, cnt = ticket
                     ticket_no.add(ticket.ticket_no)
-                    print(ticket.ticket_receipt(status, cnt))
+
+                    line_opt = ticket.ticket_receipt(status, cnt)
+                    for line, opt in line_opt:
+                        self.ticket_printer.writeline(line, **opt)
+                    
+                    # make sure everything is above cutoff line
+                    self.ticket_printer.writeline("\n\n\n", **NULL_OPT)                   
 
                     await asyncio.sleep(1)
-                         
+
                 for ticket in ticket_no:
                     await self.server_message("set_ticket_printed", ticket)
 

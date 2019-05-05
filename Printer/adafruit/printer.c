@@ -1,3 +1,8 @@
+/* 
+ * adapted from C++ code
+ * https://github.com/adafruit/Adafruit-Thermal-Printer-Library
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -24,7 +29,7 @@ static int write_bytes(struct printer *, ...);
 static long unsigned _StopIteration = 0;
 const void * StopIteration = & _StopIteration;
 
-#define write_char(self, c) (fwrite(& c, 1, 1, ((struct printer *) (self))->stream))
+#define write_char(self, c) (fputc(c, self->stream) != EOF)
 
 void printer_ctor(struct printer * self, const char * serial) 
 {
@@ -72,7 +77,7 @@ int printer_write(struct printer * self, char c)
     int result = 0;
     if (c != 0x13) {
         wait_timeout(self);
-        result = fputc((int) c, self->stream);
+        result = write_char(self, c);
         long unsigned d = BYTE_TIME;
         if (c != '\n' 
                 || self->column == self->max_column) {
@@ -90,7 +95,7 @@ int printer_write(struct printer * self, char c)
         set_timeout(self, d);
         self->prev_byte = c;
     }
-    return (result != EOF);
+    return result;
 }
 
 
@@ -108,12 +113,6 @@ size_t printer_writeline(struct printer * self, const char * line, struct line_o
     feed_line(self, 1);
     reset(self);
     return result;
-}
-
-void set_times(struct printer * self, long unsigned p, long unsigned f)
-{   
-    self->dot_print_time = p;
-    self->dot_feed_time = f;
 }
 
 void set_timeout(struct printer * self, long unsigned x)
@@ -182,49 +181,12 @@ static void unset_print_mode(struct printer * self, uint8_t mask)
     self->max_column = (self->print_mode & DOUBLE_WIDTH_MASK) ? 16 : 32;
 }
 
-void set_normal(struct printer * self)
-{
-    self->print_mode = 0;
-    write_print_mode(self);
-}
-
 static void * set_unset[] = {unset_print_mode, set_print_mode};
 #define set_unset(self, value, mask) ((void (*)()) set_unset[value])(self, mask);
-
-void set_upside_down(struct printer * self, bool value) {set_unset(self, value, UPDOWN_MASK);}
-
-void set_inverse(struct printer * self, bool value) { set_unset(self, value, INVERSE_MASK);}
-
-void set_double_height(struct printer * self, bool value) {set_unset(self, value, DOUBLE_HEIGHT_MASK);}
-
-void set_double_width(struct printer * self, bool value) {set_unset(self, value, DOUBLE_WIDTH_MASK);}
-
-void set_strike(struct printer * self, bool value) {set_unset(self, value, DOUBLE_WIDTH_MASK);}
 
 void set_bold(struct printer * self, bool value) {set_unset(self, value, BOLD_MASK);}
 
 void set_underline(struct printer * self, uint8_t weight) {write_bytes(self, ASCII_ESC, '-', weight, StopIteration);}
-
-void set_online(struct printer * self, bool value) {write_bytes(self, ASCII_ESC, '=', value, StopIteration);}
-
-void set_char_spacing(struct printer * self, int value) {write_bytes(self, ASCII_ESC, ' ', value);}
-
-void set_max_chunk_height(struct printer * self, int value) {self->max_chunk_height = value;}
-
-
-void set_charset(struct printer * self, uint8_t value) 
-{
-    if (value > 15) 
-        value = 15;
-    write_bytes(self, ASCII_ESC, 'R', value, StopIteration);
-}
-
-void set_code_page(struct printer * self, uint8_t value)
-{
-    if (value > 47) 
-        value = 47;
-    write_bytes(self, ASCII_ESC, 't', value, StopIteration);
-}
 
 void set_justify(struct printer * self, char value)
 {
@@ -246,18 +208,14 @@ void set_justify(struct printer * self, char value)
 
 void set_default(struct printer * self)
 {
-    set_online(self, true);
     set_justify(self, 'L');
-    set_inverse(self, false);
-    set_double_height(self, false);
-    set_line_height(self, 30);
     set_bold(self, false);
     set_underline(self, 0);
     set_size(self, 'S');
 }
 
 
-void sleep_after(struct printer * self, uint16_t seconds)
+static void sleep_after(struct printer * self, uint16_t seconds)
 {
     write_bytes(self, ASCII_ESC, '8', seconds, seconds >> 8, StopIteration);
 }
@@ -283,14 +241,6 @@ void feed_line(struct printer * self, uint8_t x)
 {
     write_bytes(self, ASCII_ESC, 'd', x, StopIteration);
     set_timeout(self, (self->dot_feed_time * self->char_height));
-    self->prev_byte = '\n';
-    self->column = 0;
-}
-
-void feed_rows(struct printer * self, uint8_t rows)
-{
-    write_bytes(self, ASCII_ESC, 'J', rows, StopIteration);
-    set_timeout(self, (rows * self->dot_feed_time));
     self->prev_byte = '\n';
     self->column = 0;
 }
@@ -327,17 +277,3 @@ void set_size(struct printer * self, char value)
     write_bytes(self, ASCII_GS, '!', size, StopIteration);
     self->prev_byte = '\n';
 }
-
-void set_line_height(struct printer * self, uint8_t value)
-{
-    if (value < 24)
-        value = 24;
-    self->line_spacing = value - 24;
-    write_bytes(self, ASCII_ESC, '3', value, StopIteration);
-}
-
-void tab(struct printer * self)
-{
-    write_bytes(self, ASCII_TAB, StopIteration);
-}
-

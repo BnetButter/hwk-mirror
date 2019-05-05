@@ -3,24 +3,18 @@
 #include <stddef.h>
 #include "adafruit/printer.h"
 
-static PyTypeObject PrinterType;
-
-
-#define cast(self) ((struct printer *) \
-        ((char *) self + offsetof(printer_t, stream)))
-
-
-static PyObject *ErrorObject;
+static PyObject * ErrorObject;
+static PyTypeObject Printer_Type;
 
 typedef struct {
     PyObject_HEAD
     ADAFRUIT_PRINTER_ATTR
     PyObject * x_attr;
 } PrinterObject;
+
 #define cast(self) ((struct printer *) \
         ((char *) self + offsetof(PrinterObject, stream)))
 
-static PyTypeObject Printer_Type;
 
 #define PrinterObject_Check(v)      (Py_TYPE(v) == &Printer_Type)
 
@@ -43,7 +37,6 @@ static PyObject * init_PrinterObject(PyObject * py_self, PyObject * args)
     printer_ctor(self, serial);
     Py_RETURN_NONE;
 }
-
 
 /* Printer methods */
 
@@ -154,8 +147,7 @@ static PyMethodDef Printer_methods[] = {
     {NULL,              NULL}           /* sentinel */
 };
 
-static PyObject *
-Printer_getattro(PrinterObject *self, PyObject *name)
+static PyObject * Printer_getattro(PrinterObject *self, PyObject *name)
 {
     if (self->x_attr != NULL) {
         PyObject *v = PyDict_GetItemWithError(self->x_attr, name);
@@ -170,8 +162,7 @@ Printer_getattro(PrinterObject *self, PyObject *name)
     return PyObject_GenericGetAttr((PyObject *)self, name);
 }
 
-static int
-Printer_setattr(PrinterObject *self, const char *name, PyObject *v)
+static int Printer_setattr(PrinterObject *self, const char *name, PyObject *v)
 {
     if (self->x_attr == NULL) {
         self->x_attr = PyDict_New();
@@ -243,8 +234,7 @@ PyDoc_STRVAR(printer_foo_doc,
 \n\
 Return the sum of i and j.");
 
-static PyObject *
-printer_foo(PyObject *self, PyObject *args)
+static PyObject * printer_foo(PyObject *self, PyObject *args)
 {
     long i, j;
     long res;
@@ -257,8 +247,7 @@ printer_foo(PyObject *self, PyObject *args)
 
 /* Function of no arguments returning new Printer object */
 
-static PyObject *
-printer_new(PyObject *self, PyObject *args)
+static PyObject * printer_new(PyObject *self, PyObject *args)
 {
     PrinterObject *rv;
 
@@ -272,8 +261,7 @@ printer_new(PyObject *self, PyObject *args)
 
 /* Example with subtle bug from extensions manual ("Thin Ice"). */
 
-static PyObject *
-printer_bug(PyObject *self, PyObject *args)
+static PyObject * printer_bug(PyObject *self, PyObject *args)
 {
     PyObject *list, *item;
 
@@ -427,11 +415,10 @@ static PyMethodDef printer_methods[] = {
 };
 
 PyDoc_STRVAR(module_doc,
-"This is a template module just for instruction.");
+"Interface for Adafruit Thermal Printer");
 
 
-static int
-printer_exec(PyObject *m)
+static int printer_exec(PyObject *m)
 {
     /* Slot initialization is subject to the rules of initializing globals.
        C99 requires the initializers to be "address constants".  Function
@@ -494,8 +481,7 @@ static struct PyModuleDef printermodule = {
 
 /* Export function for the module (*must* be called PyInit_printer) */
 
-PyMODINIT_FUNC
-PyInit_printer(void)
+PyMODINIT_FUNC PyInit_printer(void)
 {
     return PyModuleDef_Init(&printermodule);
 }
