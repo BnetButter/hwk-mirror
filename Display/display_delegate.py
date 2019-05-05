@@ -6,19 +6,14 @@ import websockets
 import operator
 import asyncio
 
-
-
-
 NUM_TICKETS = 5
 NULL_OPT = {}
 HEADER_OPT = {
-        "bold":bytes(1), 
         "size":bytes("L", "utf-8"),
         "justify": bytes("C", "utf-8")}
 
 ITEM_OPT = {
         "size": bytes("M", "utf-8")}
-
 
 class OrderIndex(tuple, metaclass=lib.TicketType):
     """OrderIndex(ticket, ticket_no, nth_ticket)"""
