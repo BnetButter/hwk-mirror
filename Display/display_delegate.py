@@ -148,21 +148,13 @@ class DisplayProtocol(lib.DisplayInterface):
 
         async def _print_tickets():
             while True:
-                ticket_no = set()
                 for ticket in self.ticket_generator:
                     ticket, status, cnt = ticket
-                    ticket_no.add(ticket.ticket_no)
-
                     line_opt = ticket.ticket_receipt(status, cnt)
                     for line, opt in line_opt:
                         self.ticket_printer.writeline(line, **opt)
-                    
                     # make sure everything is above cutoff line
-                    self.ticket_printer.writeline("\n\n\n", **NULL_OPT)                   
-
-                    await asyncio.sleep(1)
-
-                for ticket in ticket_no:
+                    self.ticket_printer.writeline("\n\n\n", **NULL_OPT)
                     await self.server_message("set_ticket_printed", ticket)
 
                 await asyncio.sleep(1/30)
