@@ -273,11 +273,6 @@ class ClientInterface(GlobalState):
         self.log = logging.getLogger(f"main.{self.client_id}.interface")
         self.log.setLevel(logging.WARNING)
 
-        date = time.strftime("%m-%d-%y", time.localtime())
-        handler = logging.FileHandler(filename=os.path.join(APPDATA, "logs", f"{date}-{self.client_id}.log"))
-        handler.setFormatter(logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-        self.log.addHandler(handler)
     
     async def server_message(self, request, data):
         async with websockets.connect(address) as ws:
