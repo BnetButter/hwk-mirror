@@ -1,5 +1,6 @@
 import tkinter as tk
 import lib
+import functools
 
 class ToggleMenuMode(lib.ToggleSwitch):
 
@@ -40,7 +41,13 @@ class ControlPanel(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
     
-
     def add_mode_toggle(self, menudisplay, editordisplay):
         self.toggle = ToggleFrame(self, menudisplay, editordisplay)
-        self.toggle.grid(row=0, column=0, sticky="nswe")
+        self.toggle.grid(row=0, column=0, sticky="nswe", pady=3)
+    
+    def add_invoice_printer(self):
+        command = functools.partial(lib.AsyncTk().forward, "print_invoice")
+        label = tk.Label(self, text="Invoice Receipt", font=ToggleFrame.font)
+        button = lib.LabelButton(self, text="Print", command=command, font=ToggleFrame.font)
+        label.grid(row=0, column=1, sticky="nswe", padx=3, pady=3)
+        button.grid(row=0, column=2, sticky="nswe", padx=3, pady=3)

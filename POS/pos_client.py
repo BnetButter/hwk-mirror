@@ -21,6 +21,7 @@ import logging
 import functools
 import subprocess
 import os
+import time
 
 class POSProtocol(POSInterface):
 
@@ -31,7 +32,7 @@ class POSProtocol(POSInterface):
         self.connected = False
         self.test_network_connection()
         self.connect_task = self.connect()
-        self.receipt_printer = Printer("/dev/null")
+        self.receipt_printer = Printer("/dev/serial0")
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
         self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
 
@@ -213,4 +214,18 @@ class POSProtocol(POSInterface):
         order_dct["tax"] = tax    
         return order_dct
     
-    
+    def print_invoice(self):
+        month = 2592000
+        current_time = int(time.time())
+        start_time = current_time - month
+        
+        args = [
+                "awk "
+                f"-vstart={start_time}",
+                f"-vend={current_time}",
+                "-f" + os.path.join(os.getcwd(), "POS/invoice.awk "),
+                lib.SALESLOG + " ",
+                "> /dev/serial0"
+                
+            ]
+        return subprocess.call(" ".join(args), shell=True)
