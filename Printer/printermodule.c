@@ -101,7 +101,7 @@ static PyObject * Printer_set_size(PrinterObject * self, PyObject * args)
 static PyObject * Printer_feed(PyObject * self, PyObject * args)
 {
     int line;
-    if (! PyArg_Parsetuple(args, "i:feed", & line))
+    if (! PyArg_ParseTuple(args, "i:feed", & line))
         return NULL;
     feed_line(cast(self), (uint8_t) line);
     Py_RETURN_NONE;
