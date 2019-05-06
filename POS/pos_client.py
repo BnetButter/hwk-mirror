@@ -89,9 +89,7 @@ class POSProtocol(POSInterface):
         original_dct = self.order_queue[str(ticket_no)]
         total = 0
         for i, ticket in enumerate(modified):
-            total += ticket.total \
-                    + ticket[6].total\
-                    + ticket[7].total
+            total += self.get_total(ticket, ticket[6], ticket[7])
             modified[i] = list(ticket)
             modified[i][6] = list(ticket[6])
             modified[i][7] = list(ticket[7])
