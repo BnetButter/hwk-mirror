@@ -110,7 +110,7 @@ size_t printer_writeline(struct printer * self, const char * line, struct line_o
     size_t result = 0;
     while (*line)
         result += printer_write(self, *line ++);
-    feed_line(self, 1);
+    result += printer_write(self, '\n');
     reset(self);
     return result;
 }

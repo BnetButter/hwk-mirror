@@ -65,6 +65,7 @@ class POSProtocol(POSInterface):
             
             for line in lines_conf:
                 self.receipt_printer.writeline(line[0], **line[1]) 
+            self.receipt_printer.writeline("\n\n\n")
             NewOrder()
         task.add_done_callback(callback)
           
