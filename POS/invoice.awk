@@ -22,4 +22,4 @@ BEGIN {
 
 END {
     printf("Total: %.2f\n%s\n\n\n", total / 100, message)
-}
+}19

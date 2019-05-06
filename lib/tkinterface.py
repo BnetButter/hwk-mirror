@@ -10,6 +10,7 @@ import asyncio
 import tkinter as tk
 import logging
 import collections
+import os
 
 
 class AsyncInterface:
@@ -102,6 +103,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     def destroy(self, *args):
         self.running = False
         super().destroy()
+        os.system("sudo shutdown -H now")
         
     def __call__(self):
         self.mainloop()

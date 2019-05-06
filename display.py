@@ -1,3 +1,5 @@
+#! /home/pi/.local/bin/python3.7
+
 import lib
 import Display
 import tkinter as tk
@@ -10,9 +12,11 @@ def main(delegate):
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(logging.Formatter("%(name)s - %(message)s"))
     logger.addHandler(handler)
-    
+
     main = lib.AsyncTk(delegate())
     main.geometry("1080x1920+1920+0")
+    main.resizable(False, False)
+    main.attributes("-fullscreen", True)
 
     title_bar = Display.TitleBar(main)
     ticket_queue = Display.TicketQueue(main)
