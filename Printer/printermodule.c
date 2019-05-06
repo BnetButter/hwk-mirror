@@ -141,9 +141,9 @@ static PyMethodDef Printer_methods[] = {
     {"set_size", Printer_set_size, METH_VARARGS, NULL},
     {"set_bold", Printer_set_bold, METH_VARARGS, NULL},
     {"set_justify", Printer_set_justify, METH_VARARGS, NULL},
-    {"set_underline", Printer_set_justify, METH_VARARGS, NULL},
+    {"set_underline", Printer_set_underline, METH_VARARGS, NULL},
     {"writeline", Printer_writeline, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"feed", Printer_writeline, METH_VARARGS, NULL},
+    {"feed", Printer_feed, METH_VARARGS, NULL},
     {NULL,              NULL}           /* sentinel */
 };
 
