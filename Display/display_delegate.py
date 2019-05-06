@@ -150,7 +150,7 @@ class DisplayProtocol(lib.DisplayInterface):
                         self.ticket_printer.writeline(line, **opt)
                     # make sure everything is above cutoff line
                     self.ticket_printer.writeline("\n\n\n", **NULL_OPT)
-                    await self.server_message("set_ticket_printed", ticket)
+                    await self.server_message("set_ticket_printed", ticket.ticket_no)
 
                 await asyncio.sleep(1/30)
 
