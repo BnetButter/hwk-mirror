@@ -76,18 +76,16 @@ def __str__(self):
 
 receipt_printer_style = {
     "ticket_no": {
-        "bold":bytes(1),
         "justify":bytes('C', "utf-8"),
         "size": bytes('L', "utf-8"),
     },
 
     "item": {
         "size": bytes('M', "utf-8"),
-        "underline":bytes(1),
     },
     "total": {
         "justify":bytes('R', "utf-8"),
-        "size": bytes('M', "utf-8"),
+        "size": bytes('L', "utf-8"),
     },
 }
 
