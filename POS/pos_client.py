@@ -32,7 +32,7 @@ class POSProtocol(POSInterface):
         self.connected = False
         self.test_network_connection()
         self.connect_task = self.connect()
-        self.receipt_printer = Printer("/dev/serial0")
+        self.receipt_printer = Printer("/dev/null")
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
         self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
 

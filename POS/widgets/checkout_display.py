@@ -103,7 +103,7 @@ class CheckoutTicketFrame(tk.Frame):
 
 
 class Numpad(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
-    font=("Courier", 20)
+    font=("Courier", 30)
     
     def __init__(self, parent, target, *args, **kwargs):
         super().__init__(parent, **kwargs)
@@ -112,6 +112,8 @@ class Numpad(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
         self.numpad.pack(fill=tk.BOTH)
         self.numpad.target = target
         self.parent = parent
+
+        self.bind("<FocusOut>", self.destroy)
       
     def destroy(self, *args):
         self.parent.focus_set()

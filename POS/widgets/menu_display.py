@@ -91,7 +91,7 @@ class Options(tk.Frame, metaclass=MenuWidget, device="POS"):
             [item.reset() for item in self.option_toggles]
 
 class AddonOptions(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
-    font = ("Courier", 12)
+    font = ("Courier", 14)
 
     def __init__(self, parent, order, **kwargs):
         super().__init__(parent, **kwargs)
