@@ -276,14 +276,23 @@ class ToplevelWidget(MenuWidget, ToplevelType):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         ToplevelType.__init__(self, *args, **kwargs)
-    
+
+
 class ReinstanceType(MenuWidget):
     objects = list()
     null_method = lambda:None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.instance = None
+        self._instance = None
+    
+    @property
+    def instance(self):
+        return self._instance
+    
+    @instance.setter
+    def instance(self, value):
+        self._instance = value
     
     def __call__(self, *args, **kwargs):
         if self.instance is None:

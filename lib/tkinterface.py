@@ -4,6 +4,7 @@ from operator import itemgetter
 from .data import GUI_STDERR
 from .data import GUI_STDOUT
 from .data import output_message
+from .data import DEBUG
 from .stream import stdout, stderr
 from .metaclass import SingletonType
 import asyncio
@@ -11,6 +12,8 @@ import tkinter as tk
 import logging
 import collections
 import os
+import multiprocessing
+
 
 
 class AsyncInterface:
@@ -48,7 +51,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     update_tasks = list()
     instance = None
     
-    def __init__(self, delegate=None, title=None, refreshrate=None):
+    def __init__(self, delegate=None, title=None, refreshrate=None, additional_cores=0):
         super().__init__(delegate)
         tk.Tk.__init__(self)
         self.logger = logging.getLogger(f"main.{delegate.client_id}")
@@ -103,10 +106,14 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     def destroy(self, *args):
         self.running = False
         super().destroy()
-        os.system("sudo shutdown -H now")
+        if not DEBUG:
+            os.system("sudo shutdown -H now")
         
     def __call__(self):
         self.mainloop()
+
+
+
 
 def update(func):
     @wraps(func)

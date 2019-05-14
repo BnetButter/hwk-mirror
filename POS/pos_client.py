@@ -40,36 +40,59 @@ class POSProtocol(POSInterface):
         if self.ticket_no is not None:
             ticket_no = "{:03d}".format(self.ticket_no)
             result.set(ticket_no)
-
-    def new_order(self, payment_type, cash_given, change_due):
-        order_dct = {"items":[ticket for ticket in Order()]}
-        order_dct["total"] = Order().total
+    
+    @staticmethod
+    def _new_order(payment_type, cash_given, change_due):
+        order_dct = {"items":list(ticket for ticket in Order())}
+        order_dct["total"] = Order().total 
         order_dct["subtotal"] = Order().subtotal
         order_dct["tax"] = Order().tax
         order_dct["payment_type"] = payment_type
         order_dct["cash_given"] = cash_given
         order_dct["change_due"] = change_due
+        
+        # set print flag
+
+        cnt_all = 0 # number of non-NULL items
+        cnt_reg = 0 # number of items with register flag
+        for ticket in Order():
+            items = filter(lambda item: item.name,(ticket, ticket[6], ticket[7]))
+            for item in items:
+                cnt_all += 1
+                if item.parameters.get("register", False):
+                    cnt_reg += 1
+                    item.parameters["status"] = lib.TICKET_COMPLETE
+        
+        if cnt_all == cnt_reg:
+            order_dct["print"] = False
+        else:
+            order_dct["print"] = lib.PRINT_NEW
+        return order_dct
+
+    def new_order(self, payment_type, cash_given, change_due):
+        order_dct = self._new_order(
+                payment_type, cash_given, change_due)
+        
         task = self.loop.create_task(self.server_message("new_order", order_dct))
+
         def callback(task):
             ticket_no = task.result()
             ticket_no = "{:03d}".format(ticket_no)
             self.stdout.info(f"Received ticket no. {ticket_no}")
-
-            
             lines_conf = [(ticket_no, Order().printer_style["ticket_no"])]
 
             for order in Order():
                 lines_conf.extend(order.receipt())
-
             lines_conf.append(("Total: " + "$ {:.2f}".format(Order().total / 100), 
                     Order().printer_style["total"]))
-            
             for line in lines_conf:
-                self.receipt_printer.writeline(line[0], **line[1]) 
+                self.receipt_printer.writeline(line[0], **line[1])
             self.receipt_printer.writeline("\n\n\n")
+            
+            if lib.DEBUG:
+                print("\n".join(line[0] for line in lines_conf))
             NewOrder()
         task.add_done_callback(callback)
-          
             
     def cancel_order(self, ticket_no):
         task = self.loop.create_task(self.server_message("cancel_order", ticket_no))
@@ -123,7 +146,7 @@ class POSProtocol(POSInterface):
     def remove_completed(self):
         self.loop.create_task(
                 self.server_message("remove_completed", None))
-
+    
     def edit_menu(self, new_menu):
         task = self.loop.create_task(
                 self.server_message("edit_menu", new_menu))
@@ -188,16 +211,16 @@ class POSProtocol(POSInterface):
                     total += self._item_total(addon)
         return total
 
-    
     @staticmethod
     def set_ticket_status(ticket):
         if ticket.parameters["register"]:
-            ticket.parameters["status"] = TICKET_WORKING
+            ticket.parameters["status"] = TICKET_COMPLETE
         else:
             ticket.parameters["status"] = TICKET_QUEUED
     
     @staticmethod
     def create_order(ordered_items, total, payment_type):
+        """create a modified order"""
         order_dct = {
             "items": ordered_items,
             "payment_type":payment_type,
@@ -229,3 +252,5 @@ class POSProtocol(POSInterface):
                 
             ]
         return subprocess.call(" ".join(args), shell=True)
+
+    

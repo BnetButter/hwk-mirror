@@ -1,236 +1,299 @@
-from lib import tkwidgets
-from lib.tkwidgets import LabelButton
-from lib import MenuType
-from lib import WidgetType
-from lib import MenuWidget
-from lib import ToplevelWidget
-from lib import MenuItem
+from tkinter import ttk
 from .order import Order
-import lib
+import collections
 import tkinter as tk
-
-class DropDown(tk.Frame, metaclass=MenuWidget, device="POS"):
-    """Drop down menu to select sides and drinks"""
-    menu_font = ("Courier", 14)
-    title_font = ("Courier", 16)
-    
-    def __init__(self, parent, addon, state=None):
-        super().__init__(parent)
-        if state is None:
-            state = tk.ACTIVE
-        
-        self.title = addon
-        self.variable = tk.StringVar(self)
-        self.variable.set(self.title)
-        self.items = DropDown.category(addon)
-
-        self.dropdown = tk.OptionMenu(self, self.variable, *(item[1] for item in self.items))
-        self.menu = tk.OptionMenu.nametowidget(self.dropdown, self.dropdown.menuname)
-        self.menu.configure(font=self.menu_font)
-        self.dropdown.configure(width=DropDown.longest_addon, font=self.title_font, state=state)
-        self.dropdown.grid(row=0, column=0, sticky="nswe")
-
-    def configure_dropdown(self, **kwargs):
-        self.dropdown.configure(**kwargs)
-    
-    def configure_menu(self, **kwargs):
-        self.menu.configure(**kwargs)
-
-    def reset(self):
-        self.variable.set(self.title)
-
-    def getvalue(self):
-        selected_value = self.variable.get()
-        for item in self.items:
-            if selected_value == item.name:
-                return item
-        return MenuItem("", "", 0, {})
-
-    def printvalue(self):
-        print(self.getvalue())
+import lib
+import math
+import functools
 
 
-class Options(tk.Frame, metaclass=MenuWidget, device="POS"):
-    font = ("Courier", 12)
-    width = 18
+class _EditOptions(tk.Frame, metaclass=lib.WidgetType, device="POS"):
+    font = ("Courier", 16)
 
-    def __init__(self, parent, menu_item, **kwargs):
+    def __init__(self, parent, item, **kwargs):
         super().__init__(parent, **kwargs)
-        self.has_options = False
-        if menu_item.options:
-            self.has_options = True
-            self.option_toggles = [
-                    tkwidgets.ToggleSwitch(self, text,
-                        font=self.font,
-                        width=self.width)
-                        for text in menu_item.options
-                    ]
-            row = 0
-            column = 0
-            for item in self.option_toggles:
-                # two options per row
-                if column == 2:
-                    column = 0
-                    row += 1
-                item.grid(row=row, column=column, sticky='w')
-                column += 1
+        label = tk.Label(self, font=self.font, text=f"{item.name}")
+        self.item = item
+        self.options = [lib.ToggleSwitch(self, text=option, font=self.font,) for option in item.options]
+        self.grid_columnconfigure(0, weight=1)
 
-    def __bool__(self):
-        return self.has_options
+        label.grid(row=0, column=0, columnspan=2, sticky="nsw", padx=5, pady=5)
+        tk.Label(self, text="    ", font=self.font).grid(row=1, column=0, sticky="nswe")
+        for i, option in enumerate(self.options):
+            option.grid(row=i+1, column=1, sticky="nswe", padx=5, pady=10, ipadx=5, ipady=5)
 
-    def getvalue(self):        
-        if self.has_options:
-            return [item["text"] for item in self.option_toggles if item]
-        return []
+    def apply(self):
+        self.item.selected_options = (option["text"] for option in self.options if option)
 
-    def printvalue(self):
-        print(self.getvalue())
 
-    def reset(self):
-        if self.has_options:
-            [item.reset() for item in self.option_toggles]
+class OptionsEditor(tk.Toplevel, metaclass=lib.ToplevelType):
 
-class AddonOptions(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
-    font = ("Courier", 14)
+    def __new__(cls, parent, **kwargs):
+        ticket = Order()[-1]
+        ticket = ticket, ticket.addon1, ticket.addon2
+        ticket = [item for item in ticket if item.options]
+        if ticket:
+            return super().__new__(cls)
 
-    def __init__(self, parent, order, **kwargs):
+    def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.wm_title(string="Configure Addon")
+        self.wm_title("Options")
+        ticket = Order()[-1]
+        ticket = ticket, ticket.addon1, ticket.addon2
 
-        self.addon1 = addon1 = order.addon1
-        self.addon2 = addon2 = order.addon2
-        self.option_frame1 = Options(self, addon1)
-        self.option_frame2 = Options(self, addon2)
-        
-        if addon1.options:
-            self.label(addon1.name).pack()
-            self.option_frame1.pack()
-        if addon2.options:
-            self.label(addon2.name).pack()
-            self.option_frame2.pack()
-        self.protocol("WM_DELETE_WINDOW", self.close)
-        
-        done = tk.Button(self, text="Done", bg="green", command=self.close)
-        close = tk.Button(self, text="Close", bg="red", command=self.destroy)
-        close.pack(pady=10, padx=5, side=tk.LEFT)
-        done.pack(pady=10, padx=5, side=tk.LEFT)
-    
-    def label(self, name):
-        return tk.Label(self,
-                text=f"Select options for {name}", 
-                font=self.font)
+        self.option_editors = [_EditOptions(self, item) for item in ticket if item.options]
+        for i, frame in enumerate(self.option_editors):
+            frame.grid_columnconfigure((i*2), weight=1)
+            frame.grid(row=0, column=i * 2, sticky="nswe")
+            
 
-    def close(self, *args):
+        separators = (ttk.Separator(self, orient=tk.VERTICAL)
+            for i in range(len(self.option_editors) - 1))
 
-        self.addon1.selected_options = self.option_frame1.getvalue()
-        self.addon2.selected_options = self.option_frame2.getvalue()
+        for i, separator in enumerate(separators):
+            separator.grid(row=0, column=(i * 2) + 1, sticky="ns")
+
+        frame = tk.Frame(self)
+        apply = tk.Button(frame, text="Apply", command=self.apply, font=("Courier", 14), bg="green")
+        close = tk.Button(frame, text="Close", command=self.destroy, font=("Courier", 14))
+        close.pack(side=tk.LEFT, padx=5, pady=5)
+        apply.pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Separator(self).grid(row=1, column=0, columnspan=3, sticky="we")
+        frame.grid(row=2, column=0, sticky="w")
+
+    def apply(self, *args):
+        for editor in self.option_editors:
+            editor.apply()
         self.destroy()
 
-class OptionButton(LabelButton):
-    """Button widget that grid/ungrids option frame"""
 
-    def __init__(self, parent, option_frame, **kwargs):    
-        super().__init__(parent, "options")
-        self.gridded_frame = False
-        self.option_frame = option_frame
-        self.inactive_config = {"bg":"green", "relief":tk.RAISED}
-        self.has_options_config = {"bg": "white smoke", "relief": tk.SUNKEN}
-        self.configure(bg="green")
+class SingletonMenu(lib.SingletonType, lib.MenuType):
+    """resolve metaclass conflict"""
 
-    def on_release(self, *args):
-        if self.gridded_frame:
-            self.gridded_frame = False
-            self.configure(**self.inactive_config)
-            self.option_frame.grid_forget()
-        else:
-            self.gridded_frame = True
-            self.configure(**self.has_options_config)
-            self.option_frame.grid(
-                    row=2,
-                    column=1,
-                    columnspan=2)
+# for higher throughput, items will be added to Order sequentially.
+# OrderNavigator() uses the first item to decide the next two tabs to lift
+# because want to cut down on the amount of taps it takes to complete a set
+# of actions.
+#
+# We also want to closely replicate the order in which a customer may place an order
+# so as to minimize cognitive load on the user.
+#
+# A previous version had drop down menus for "Sides" and "Drinks" addons.
+# Adding a Side as an addon would therefore require 2 taps.
+# then adding the order itself would take another tap.
+# Given the small size of the drop down menu, it was also error prone.
+# So this should minimize error and the amount of screen taps needed to
+# add an order to the global Order() list
 
+class _OrderNagivator(metaclass=SingletonMenu):
+    null = lib.MenuItem("", "", 0, {})
+
+    def __init__(self, tabframe, **kwargs):
+        assert isinstance(tabframe, lib.TabbedFrame)
+        self.parent = tabframe
+        self.counter = 0
+        self.select = functools.partial(lib.TabbedFrame.select, tabframe)
+        null = type(self).null
+        self.items = [null, null, null]
+
+        # these are the only relevant categories.
+        # default are item categories that are not in two sides and no addons.
+        self.tab_selector = {
+            # default | two sides | no addons
+            1:["Sides", "Sides",    None],
+            2:["Drinks","Sides",    None]
+        }
+
+        self.case = 0
+        self.current_order_len = 0
+
+    @lib.update
+    def update(self):
+        if self.current_order_len != len(Order()):
+            self.current_order_len = len(Order())
+            self.reset()
+
+    def add_item(self, item=null):
+        cls = type(self)
+        self.items[self.counter] = item
+
+        # decide the next 2 tabs
+        if self.counter == 0:
+            if item is cls.null:
+                return
+            Order()(*self.items)
+            self.current_order_len += 1
+            if item.category in cls.two_sides:
+                self.case = 1
+            elif item.category in cls.no_addons:
+                self.create_ticket()
+                return
+        
+        self.update_ticket()
+        self.counter += 1
+        try:
+            tab = self.tab_selector[self.counter][self.case]
+            self.select(tab)
+        except:
+            self.create_ticket()
+    
+
+    def remove_item(self):
+        self.items[self.counter] = type(self).null
+        self.counter -= 1
+        
+
+    def update_ticket(self):
+        try:
+            Order().pop()
+            Order()(*self.items)
+        except:
+            Order()(*self.items)
+    
     def reset(self):
-        self.option_frame.grid_forget()
-        self.configure(**self.inactive_config)
-        self.gridded_frame = False
-
-
-class ItemSelector(tk.Frame, metaclass=MenuWidget, device="POS"):
-    font = ("Courier", 16)
-    
-    def __init__(self, parent, menu_item, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.menu_item = menu_item
-        self.label = tk.Label(self, 
-                text=menu_item.name,
-                font=self.font,
-                width=ItemSelector.longest_item,
-                anchor="w")
-
-        self.options_frame = Options(self, menu_item)
-        self.options_button = OptionButton(self, self.options_frame, 
-                font=(self.font[0], int(self.font[1]) * (2/3)))
+        self.items = [type(self).null for i in range(3)]
+        self.counter = 0
         
-        if menu_item.category not in ItemSelector.two_sides:
-            title1 = "Sides"
-            title2 = "Drinks"
-        else:
-            title1 = "Sides"
-            title2 = "Sides"
-        
-        if menu_item.category in ItemSelector.no_addons:
-            state = tk.DISABLED
-        else:
-            state = None
-        
-        self.dropdown1 = DropDown(self, title1, state=state)
-        self.dropdown2 = DropDown(self, title2, state=state)
-
-        self.add_button = tk.Button(self, text="+", command=self._button_callback)
-        self.add_button.configure(bg="green")
-        self._grid()
-    
-    def _grid(self):
-        self.grid_rowconfigure(0, weight=1)
-        self.label.grid(row=0, column=0, rowspan=2, sticky="w")
-
-        if self.options_frame:
-            self.options_button.grid(row=1, column=0, sticky="ne")
-            self.dropdown1.grid(row=0, column=1, rowspan=2, sticky="nwe")
-            self.dropdown2.grid(row=0, column=2, rowspan=2, sticky="nwe")
-            self.add_button.grid(row=0, column=3, rowspan=2, sticky="nswe")
-        else:
-            self.dropdown1.grid(row=0, column=1, sticky="nswe")
-            self.dropdown2.grid(row=0, column=2, sticky="nswe")
-            self.add_button.grid(row=0,column=3, sticky="nswe")
-    
-    def _button_callback(self, *args):
-
-        addon1 = self.dropdown1.getvalue()
-        addon2 = self.dropdown2.getvalue()
-        selected_options = self.options_frame.getvalue()
-
-        Order()(self.menu_item, 
-                addon1,
-                addon2,
-                selected_options)
-
-        if addon1.options or addon2.options:
-            AddonOptions(self, Order()[-1])
+    def create_ticket(self):
+        OptionsEditor(self.parent)
         self.reset()
-
-    def reset(self):
-        self.dropdown1.reset()
-        self.dropdown2.reset()
-        self.options_frame.reset()
-        self.options_button.reset()
     
-class CategoryFrame(tkwidgets.ScrollFrame, metaclass=MenuType):
+def OrderNavigator(parent=None, **kwargs):
+    return _OrderNagivator(parent, **kwargs)
+
+
+
+class ItemButton(lib.MessageButton, metaclass=lib.MenuWidget, device="POS"):
+
+    font = ("Courier", 25)
+    def __init__(self, parent, item, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.item = item
+        self.configure(font=type(self).font, text=self.item.name)
+    
+    def set_command(self, orderdisplay, ordertab):
+        def command():
+            orderdisplay.instance.select(ordertab)
+            OrderNavigator().add_item(self.item)
+        self.command = command
+    
+
+class OpenCharge(tk.Frame, metaclass=lib.MenuWidget, device="POS"):
+    
+    font=("Courier", 25)
 
     def __init__(self, parent, category, **kwargs):
         super().__init__(parent, **kwargs)
-        self.item_frames = [
-                ItemSelector(self.interior, item) for item in CategoryFrame.category(category)]
-        for i, item in enumerate(self.item_frames):
-            item.grid(row=i, column=0, columnspan=4, sticky="nswe")
+        self.category = category
+        self.price_input = lib.PriceInput(self, 
+                font=self.font,
+                width=7)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.button = lib.MessageButton(self, text="Open Charge",
+                anchor=tk.W, 
+                font=self.font,
+                relief=tk.RAISED,
+                bd=2)
+        
+        self.button.command = self.add_item
+        self.button.grid(row=0, column=0, sticky="nswe")
+        self.price_input.grid(row=0, column=1, sticky="nswe")
+
+        self.update()
+
+    def add_item(self):
+        price = int(self.price_input.value)
+        if price:
+            item = self.category, "Open Charge", price, {}
+            OrderNavigator().add_item(
+                lib.MenuItem(*item))
+    
+    @lib.update
+    def update(self):
+        price = int(self.price_input.value)
+        if price:
+            self.button.activate()
+        else:
+            self.button.deactivate()
+
+
+class NullItem(lib.LabelButton, metaclass=lib.WidgetType, device="POS"):
+    font=("Courier", 25)
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, "None",
+                font=type(self).font,
+                command=OrderNavigator().add_item,
+                **kwargs)
+        self.update()
+
+
+    @lib.update
+    def update(self):
+        if not OrderNavigator().counter:
+            self.deactivate()
+        else:
+            self.activate()
+
+class CategoryFrame(lib.ScrollFrame, metaclass=lib.MenuType):
+    
+    def __init__(self, parent, category, **kwargs):
+        assert isinstance(parent, lib.TabbedFrame)
+        super().__init__(parent, **kwargs)
+        self.buttons = [
+            ItemButton(self.interior, item,
+                    width=200,
+                    aspect=150,
+                    bd=2, relief=tk.RAISED)
+
+            for item in type(self).category(category)
+        ]
+
+        column = 0
+        row = 1
+        self.none = NullItem(self.interior)
+        self.open_charge = OpenCharge(self.interior, category)
+        self.none.grid(row=row, column=0, pady=10, padx=10, sticky="nswe")
+        self.open_charge.grid(row=row, column=1, columnspan=2, sticky="nswe", pady=10, padx=10)
+
+        for i in range(3):
+            self.interior.grid_columnconfigure(i, weight=1)
+
+        for button in self.buttons:
+            if column == 3:
+                self.interior.grid_rowconfigure(row, weight=1)
+                column = 0
+                row += 1
+                continue
+            button.grid(
+                    row=row + 1,
+                    column=column,
+                    sticky="nswe",
+                    padx=10,
+                    pady=10,
+                    ipady=10)
+            column += 1
+        
+
+    def set_keypress_bind(self, 
+            target,
+            menudisplay,
+            orderdisplay,
+            orderdisplay_tab):
+        
+        def input_condition():
+            cond1 = menudisplay.instance.current() == self.open_charge.category
+            cond2 = orderdisplay.instance.current() == orderdisplay_tab
+            return cond1 and cond2
+        
+        on_enter = self.open_charge.add_item
+
+        return self.open_charge.price_input.set_keypress_bind(
+                target,
+                condition=input_condition,
+                on_enter=on_enter)
+
+    def set_item_command(self, orderdisplay, tab="Orders"):
+        for button in self.buttons:
+            button.set_command(orderdisplay, tab)

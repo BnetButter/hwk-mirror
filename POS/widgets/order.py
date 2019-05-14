@@ -159,7 +159,6 @@ def receipt(self) -> str:
     lines.append(("\n", NULL_DICT)) # need a newline to start printing
     return lines
 
-
 @log_info("Created new order", time=True)
 def NewOrder():
     return OrderInterface("Orders", (Ticket,), {

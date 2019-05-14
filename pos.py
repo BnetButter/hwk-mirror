@@ -3,6 +3,7 @@ import POS
 import tkinter as tk
 import logging
 import sys
+import functools
 
 
 def main(protocol):
@@ -16,6 +17,7 @@ def main(protocol):
     main.grid_rowconfigure(1, weight=1)
     main.resizable(False, False)
     
+
     title_bar = POS.TitleBar(main, bd=2)
     menu_display = POS.MenuDisplay(main, relief=tk.RIDGE, bd=2)
     order_display = POS.OrderDisplay(main, bd=2, relief=tk.RIDGE)

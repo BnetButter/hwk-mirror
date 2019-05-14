@@ -3,7 +3,7 @@ ACTIVATE = /home/bnetbutter/.env/hwk/bin/activate
 
 
 all: activate
-	$(PYTHON) main.py
+	$(PYTHON) main.py pos
 
 activate:
 	/bin/bash $(ACTIVATE) hwk

@@ -48,8 +48,7 @@ class LabelButton(tk.Label):
         self.bind("<Button-1>", self.on_click)
         self.bind("<ButtonRelease-1>", self.on_release)
         self._active = True
-    
-        
+
     def activate(self):
         self.configure(**self.active_config)
         self._active = True
@@ -68,6 +67,30 @@ class LabelButton(tk.Label):
             self.command()
 
 
+class MessageButton(tk.Message):
+    null_cmd = lambda: None
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.command = type(self).null_cmd
+        self._active = True
+        self.bind("<Button-1>", self.on_press)
+        self.bind("<ButtonRelease-1>", self.on_release)
+
+    def on_press(self, event):
+        self.configure(relief=tk.SUNKEN)
+
+    def on_release(self, event):
+        self.configure(relief=tk.RAISED)
+        self.command()
+    
+    def activate(self):
+        self.configure(relief=tk.RAISED, fg="black")
+        self._active = True
+
+    def deactivate(self):
+        self.configure(relief=tk.GROOVE, fg="grey26")
+        self._active = False
 
 class ToggleSwitch(LabelButton):
 
@@ -247,8 +270,74 @@ class TabbedFrame(tk.Frame):
         frame = self.data.pop(key)
         self._notebook.forget(self._tab_ids.pop(key))
         return frame
+
+class PriceInput(tk.Entry):
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._value = kwargs.get("textvariable")
+        if self._value is None:
+            self._value = tk.StringVar(parent)
+            self._value.set("0.00")
+        
+        self.configure(
+                textvariable=self._value,
+                state=tk.DISABLED,
+                disabledforeground="black",
+                disabledbackground="white")
+
+    def set_keypress_bind(self, target,
+            condition=lambda *args:False,
+            on_enter=lambda:None):
+        
+        def on_event(event):            
+            if not condition():
+                return
+            
+            if not (event.keysym in type(self).valid_keysyms
+                    or event.keysym in type(self).numlock_switch):
+                return
+
+            char = event.char
+            if event.keysym in type(self).numlock_switch:
+                char = type(self).numlock_switch[event.keysym]
+
+            if event.keysym == "KP_Enter":
+                return on_enter()
+            elif event.keysym == "BackSpace":
+                self.value = 0
+                return
+            self.value += char
+        
+        return target.bind("<Key>", on_event, "+")
+
+    @property
+    def value(self):
+        return self._value.get().replace(".", "")
     
- 
+    @value.setter
+    def value(self, val):
+        val = int(val)
+        self._value.set("{:.2f}".format(val / 100))
+    
+    valid_keysyms = [f"KP_{i}" for i in range(10)]
+    valid_keysyms.extend(("KP_Enter", "BackSpace"))
+
+    # input numbers even without numlock
+    numlock_switch = {
+            "KP_Insert": "0",
+            "KP_Delete": "00",
+            "KP_Decimal":"00",
+            "KP_End":    "1",
+            "KP_Down":   "2",
+            "KP_Next":   "3",
+            "KP_Left":   "4",
+            "KP_Begin":  "5",
+            "KP_Right":  "6",
+            "KP_Home":   "7",
+            "KP_Up":     "8",
+            "KP_Prior":  "9",
+        }        
 
 def write_enable(func):
     @wraps(func)

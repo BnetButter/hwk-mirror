@@ -50,5 +50,12 @@ def main():
         pos_process.start()
         display_process.start()
 
+
 if __name__ == "__main__":
     main()
+
+
+
+
+    
+

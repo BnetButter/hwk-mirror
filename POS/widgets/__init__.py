@@ -15,19 +15,7 @@ from .progress_tab import *
 from .order import Order, NewOrder
 from .control_panel import *
 
-class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
-    tabfont = ("Courier", 14)
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.style.configure("MenuDisplay.TNotebook.Tab",
-                font=self.tabfont,
-                padding=5)
-        
-        self._notebook.configure(style="MenuDisplay.TNotebook")
-        for category in MenuDisplay.categories:
-            self[category] = CategoryFrame(self, category)
 
-        
 class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
     tabfont = ("Courier", 14)
     
@@ -46,6 +34,8 @@ class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
         self["Checkout"] = checkout_frame
         self["Processing"] = progress_frame
 
+        checkout_frame.set_keypress_bind(self, "Checkout", on_enter=checkout_frame.on_enter)
+
     def ctor(self):
         self.update()
     
@@ -59,7 +49,26 @@ class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
         self["Processing"].update_order_status())
 
 
-class Console(TabbedFrame, metaclass=WidgetType, device="POS"):        
+class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
+    tabfont = ("Courier", 14)
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.style.configure("MenuDisplay.TNotebook.Tab",
+                font=self.tabfont,
+                padding=5)
+        self.navigator = OrderNavigator(parent=self)
+        self.navigator.update()
+        self._notebook.configure(style="MenuDisplay.TNotebook")
+        for category in MenuDisplay.categories:
+            self[category] = CategoryFrame(self, category)
+            self[category].set_keypress_bind(lib.AsyncTk(), MenuDisplay, OrderDisplay, "Orders")
+            self[category].set_item_command(OrderDisplay)
+    
+    def set_keypress_bind(self, orderdisplay):
+        for frame in self.data.values():
+            frame.set_keypress_bind(lib.AsyncTk(), self, orderdisplay, "Orders")
+
+class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
     tabfont = ("Courier", 10)
     instance = None
 

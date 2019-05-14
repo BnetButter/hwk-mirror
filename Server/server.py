@@ -11,10 +11,10 @@ class Server(ServerInterface):
     def __init__(self):
         super().__init__()
         self.salesinfo = lib.SalesInfo(lib.SALESLOG)
+        self.loop.create_task(self.cleanup())
 
     async def new_order(self, ws, data):
         self.order_queue[self.ticket_no] = data
-        data["print"] = lib.PRINT_NEW # cooks line ticket printer flag
         await ws.send(json.dumps({"result":self.ticket_no}))
         self.ticket_no += 1
     
@@ -97,13 +97,21 @@ class Server(ServerInterface):
         return await ws.send(json.dumps({"result": (True, "")}))
     
     @staticmethod
-    def order_complete(items):    
+    def order_complete(items):
         valid_items = (item 
                 for ticket in items
                     for item in (ticket, ticket[6], ticket[7])
                         if item[1])
         return all(item[5].get("status") == lib.TICKET_COMPLETE
                 for item in valid_items)
+
+    async def cleanup(self):
+        while True:
+            await asyncio.sleep(1/30)
+            for ticket_no in self.order_queue:
+                if self.order_complete(self.order_queue[ticket_no]["items"]):
+                    self.order_queue.pop(ticket_no)
+
 
     async def get_time(self, ws, data):
         await ws.send(json.dumps({"result":(True, int(datetime.now()))}))
