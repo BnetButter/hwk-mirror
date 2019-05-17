@@ -35,6 +35,7 @@ static int Drawer_init(PyObject * self, PyObject * args, PyObject * kwds)
     if (wiringPiSetup() == -1)
         return 0;
     pinMode(SIGNAL_PIN, OUTPUT);
+    return 0;
 }
 
 static PyObject * Drawer_open(PyObject * self, PyObject * args)
