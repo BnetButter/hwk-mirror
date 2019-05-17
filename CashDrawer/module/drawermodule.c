@@ -32,7 +32,7 @@ static void Drawer_dealloc(DrawerObject *self)
 
 static int Drawer_init(PyObject * self, PyObject * args, PyObject * kwds) 
 {
-    if (WiringPiSetup() == -1)
+    if (wiringPiSetup() == -1)
         return 0;
     pinMode(SIGNAL_PIN, OUTPUT);
 }
@@ -52,9 +52,9 @@ static PyObject * Drawer_open(PyObject * self, PyObject * args)
 
 static PyMethodDef Drawer_methods[] = {
     {"open", (PyCFunction) Drawer_open, METH_VARARGS, PyDoc_STR(
-            "open() -> None\n
-             Open the cash drawer.\n
-             Does nothing if already opened.")
+            "open() -> None\n"
+             "Open the cash drawer.\n"
+             "Does nothing if already opened.")
     },
 
     /* sentinel */
