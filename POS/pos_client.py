@@ -117,7 +117,7 @@ class POSProtocol(POSInterface):
                 self.stdout.info(message)
         task.add_done_callback(callback)
     
-    def modify_order(self, ticket_no, modified, *args):
+    def modify_order(self, ticket_no, modified, change):
         original_dct = self.order_queue[str(ticket_no)]
         total = 0
         for i, ticket in enumerate(modified):
@@ -129,7 +129,7 @@ class POSProtocol(POSInterface):
         modified_dct = self.create_order(modified, 
                 total,
                 original_dct["payment_type"])
-
+        
         task = self.loop.create_task(self.server_message("modify_order", (ticket_no, modified_dct)))
         def callback(task):
             _ticket_no = "{:03d}".format(ticket_no)
@@ -137,20 +137,18 @@ class POSProtocol(POSInterface):
             if result:
                 message = "Modified ticket no. {} - Price difference: {}"
                 difference = "{:.2f}".format((total - original_dct["total"]) / 100)
-                if original_dct["payment_type"] == "Cash" and difference != "0.00":
+                self.stdout.info(message.format(_ticket_no, difference))
+                # only open drawer if necessary
+                if original_dct["payment_type"] == "Cash"   \
+                        and difference != "0.00"            \
+                        and change:
                     self.cash_drawer.open()
                     if lib.DEBUG:
                         print("opening cash drawer...")
-                
-                else:
-                    ...
-                
-                self.stdout.info(message.format(_ticket_no, difference))
+                    self.stdout.info("  Change Due: {:.2f}".format(change / 100))
             else:
                 self.stdout.critical(f"Failed to modify ticket no. {'{:03d}'.format(int(ticket_no))}. - {reason}")
-
         task.add_done_callback(callback)
-        
     def get_order_info(self, ticket_no, *args):
         if args:
             return (self.order_queue[str(ticket_no)].get(arg) for arg in args)

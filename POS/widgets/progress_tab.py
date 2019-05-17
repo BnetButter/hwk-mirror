@@ -95,7 +95,7 @@ class ItemEditor(metaclass=ItemEditorType, device="POS"):
                 style="ItemEditor.TCombobox",
                 font=self.font,
                 width=type(self).longest_item,
-                postcommand=self.send_alert)
+                postcommand=self.post_command)
         
         self.edit_options = LabelButton(parent, "Options",
                 width=7,
@@ -126,6 +126,10 @@ class ItemEditor(metaclass=ItemEditorType, device="POS"):
     def send_alert(self):
         if self.ticket.parameters.get("register", False):
             alert(f"'{self.ticket.name}' may have been completed")
+    
+    def post_command(self):
+        self.send_alert()
+        self.ticket.selected_options.clear()
     
     @property
     def ticket(self):
@@ -162,7 +166,7 @@ class ItemEditor(metaclass=ItemEditorType, device="POS"):
     def _remove_callback(self, *args):
         self.removed = True
         if self.ticket is not None:
-            self.send_alert()
+            self.send_alert
         self.item_selector.lower()
         self.edit_options.grid_remove()
         self.remove_item.grid_remove()
@@ -271,7 +275,7 @@ class TicketEditorFrame(tk.Frame):
         self.is_gridded = False
         self.original_total = None
 
-
+    
     @property
     def difference(self):
         try:
@@ -399,6 +403,11 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
             cls.editor.update()
         return super().__new__(cls)
 
+
+    @classmethod
+    def set_keypress_bind(cls, *args, **kwargs):
+        cls.editor.calculator.price_input.set_keypress_bind(*args, **kwargs)
+
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.grid_columnconfigure(2, weight=1)
@@ -448,7 +457,8 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         
         self.modify_button.lift()
         self.cancel_button.lift()
-        
+    
+
     def _update(self, ticket_no):
         ticket_no = int(ticket_no)
         self.ticket_no["text"] = "{:03d}".format(ticket_no)
@@ -520,14 +530,19 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.modify_button.lift()
     
     def on_modify_confirm(self, *args):
+        if self.editor.calculator.change_due.get() == "- - -"\
+                and self.editor.difference:
+            return AsyncTk().forward("stdout").info("Amount given is less than difference value")
         AsyncTk().forward("modify_order",
                 self.editor.ticket_no,
-                self.editor.create_order())
+                self.editor.create_order(),
+                self.editor.calculator.change)            
         self.editor.grid_remove()
         self.confirm_modify.grid_remove()
 
     def on_modify_return(self):
         self.editor.grid_remove()
+        self.editor.calculator.cash_given.set("0.00")
         self.confirm_modify.grid_remove()
         self.modify_button.lift()
         self.cancel_button.lift()
@@ -541,7 +556,8 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
             self.editor.grid_remove()
             self.confirm_modify.grid_remove()
         super().grid_remove()
-    
+
+
 class ProgressFrame(ScrollFrame):
 
     def __init__(self, parent, initial_size=10, show_completed_num=2, **kwargs):
@@ -549,7 +565,21 @@ class ProgressFrame(ScrollFrame):
         self.interior.grid_columnconfigure(1, weight=1)
         self.widget_cache = WidgetCache(OrderProgress, self.interior, initial_size=initial_size)
         self.show_completed_num = show_completed_num
-    
+        self.set_keypress_bind = OrderProgress.set_keypress_bind
+
+    def keybind_condition(self, notebook, tab):
+        def func():
+            return (notebook.current() == tab
+                and OrderProgress.editor.is_gridded)
+        return func
+        
+    def on_enter(self):
+        editor = OrderProgress.editor
+        assert editor.is_gridded
+        frame = editor.grid_info()["in"]
+        assert isinstance(frame, OrderProgress)
+        frame.on_modify_confirm()
+
     @update
     def update_order_status(self):
         order_queue = AsyncTk().forward("order_queue")

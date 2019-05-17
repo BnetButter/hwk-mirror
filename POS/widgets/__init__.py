@@ -35,6 +35,11 @@ class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
         self["Processing"] = progress_frame
 
         checkout_frame.set_keypress_bind(self, "Checkout", on_enter=checkout_frame.on_enter)
+        # alias for lib.PriceInput.set_keypress_bind
+        progress_frame.set_keypress_bind(lib.AsyncTk(),
+                condition=progress_frame.keybind_condition(self, "Processing"),
+                on_enter=progress_frame.on_enter)
+
 
     def ctor(self):
         self.update()

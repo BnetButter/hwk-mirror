@@ -178,14 +178,15 @@ class MenuItemEditor(PriceEntry, metaclass=lib.MenuWidget, device="POS"):
         self.item = menu_item.name
         self.price = menu_item.price
 
-        self.item_entry["font"] = self.font
         self.price_entry["font"] = self.font
+        self.item_entry.configure(font=self.font,
+                state=tk.DISABLED,
+                disabledforeground="black")
+    
         self.options_bt = lib.LabelButton(self, text="Options", width=7, font=self.font)
         self.remove_bt = lib.LabelButton(self, text="Remove", width=7, font=self.font, command=self.grid_remove)
         self.options_bt.grid(row=0, column=2, sticky="nswe", padx=2)
         self.remove_bt.grid(row=0, column=3, sticky="nswe", padx=2)
-
-
 
     def grid(self, **kwargs):
         self.removed = False
