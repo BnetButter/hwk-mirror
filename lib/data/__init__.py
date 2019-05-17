@@ -22,11 +22,11 @@ except:
         dump(DEFAULT_MENU, fp, indent=4)
     CONFIGDATA = DEFAULT_MENU
 
-
-router_ip = CONFIGDATA["router"]
-device_ip = CONFIGDATA["ip"] # ip address of the RPI running the server process
-port = CONFIGDATA["port"] # port of the primary server handler
 DEBUG = CONFIGDATA["__debug"]
+
+router_ip = "192.168.0.1" if DEBUG else CONFIGDATA["router"]
+device_ip = "192.168.0.5" if DEBUG else CONFIGDATA["ip"]
+port = CONFIGDATA["port"] # port of the primary server handler
 address = f"ws://{device_ip}:{port}"
 
 
