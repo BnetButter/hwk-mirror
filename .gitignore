@@ -7,3 +7,6 @@ hwk_system.egg-info
 HWK-System.code-workspace
 testfile
 Printer/testfile
+CashDrawer/module/build/temp.linux-x86_64-3.7/drawermodule.o
+*.o
+**/build

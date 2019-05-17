@@ -24,13 +24,7 @@ class Server(ServerInterface):
         await ws.send(json.dumps({"result": (True, None)}))
 
     async def cancel_order(self, ws, data):
-        # set order status as complete
-        parameters = operator.itemgetter(5)
-        for ticket in self.order_queue[data]["items"]:
-            parameters(ticket[:6])["status"] = lib.TICKET_COMPLETE
-            parameters(ticket[6])["status"] = lib.TICKET_COMPLETE
-            parameters(ticket[7])["status"] = lib.TICKET_COMPLETE
-        
+        # set order status as complete        
         ticket = self.order_queue[data]
         await ws.send(json.dumps({"result":ticket}))
         self.order_queue[data]["print"] = lib.PRINT_NUL
@@ -58,9 +52,6 @@ class Server(ServerInterface):
         parameters(ticket[6])["status"] = value
         parameters(ticket[7])["status"] = value
         await ws.send(json.dumps({"result":(True, None)}))
-        if self.order_complete(ordered_items):
-            self.salesinfo.write(self.order_queue[ticket_no])
-            self.order_queue.pop(ticket_no)
     
     async def set_order_status(self, ws, data):    
         ticket_no, value = data
@@ -73,10 +64,6 @@ class Server(ServerInterface):
                 parameters(ticket[6])["status"] = value
                 parameters(ticket[7])["status"] = value
             await ws.send(json.dumps({"result":(True, None)}))
-        
-        if self.order_complete(self.order_queue[ticket_no]["items"]):
-            self.salesinfo.write(self.order_queue[ticket_no])
-            self.order_queue.pop(ticket_no)
 
     async def set_item_status(self, ws, data):
         ticket_no, nth_ticket, item_idx, value = data
@@ -93,7 +80,7 @@ class Server(ServerInterface):
     async def remove_completed(self, ws, data):    
         for ticket_no in self.order_queue:
             if self.order_complete(self.order_queue[ticket_no]["items"]):
-                self.order_queue.pop(ticket_no)
+                self.salesinfo.write(self.order_queue.pop(ticket_no))
         return await ws.send(json.dumps({"result": (True, "")}))
     
     @staticmethod
@@ -110,8 +97,7 @@ class Server(ServerInterface):
             await asyncio.sleep(1/30)
             for ticket_no in self.order_queue:
                 if self.order_complete(self.order_queue[ticket_no]["items"]):
-                    self.order_queue.pop(ticket_no)
-
+                    self.salesinfo.write(self.order_queue.pop(ticket_no))
 
     async def get_time(self, ws, data):
         await ws.send(json.dumps({"result":(True, int(datetime.now()))}))
@@ -128,6 +114,7 @@ class Server(ServerInterface):
         return await ws.send(json.dumps({"result": (False, "Failed to write menu")}))
 
     async def get_menu(self, ws, data):
+
         with open(lib.MENUPATH, "r") as fp:
             await ws.send(json.dumps({"result": (True, json.load(fp))}))
         return await ws.send(json.dumps({"result": (False, f"Failed to read menu at {lib.MENUPATH}")}))

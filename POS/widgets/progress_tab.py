@@ -126,7 +126,7 @@ class ItemEditor(metaclass=ItemEditorType, device="POS"):
     def send_alert(self):
         if self.ticket.parameters.get("register", False):
             alert(f"'{self.ticket.name}' may have been completed")
-
+    
     @property
     def ticket(self):
         return self._ticket
@@ -489,29 +489,32 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.cancel_button.lift()
         self.modify_button.lift()
         ticket_no = int(self.ticket_no["text"])
-        original, = AsyncTk().forward("get_order_info", ticket_no, "items")
-        modified_order = []
-        for ticket in original:
-            items = ticket[:6], ticket[6], ticket[7]        
-            for item in items:
-                if item[5].get("status") == TICKET_COMPLETE:
-                    _item = MutableTicket(item)
-                    null_ticket = MutableTicket(("", "", 0, {}, [], {}))
-                    _item.data.extend((null_ticket, null_ticket))
-                    modified_order.append(_item)
 
-        if modified_order:
-            names = ", ".join(f"'{ticket.name}'" for ticket in modified_order)
-            logging.getLogger("main.POS.gui.stdout").info(
-                f"{names} cannot be removed. Modifying ticket instead..."
-            )
-            return AsyncTk().forward("modify_order", ticket_no, modified_order)
+        #uncomment to prevent cancellation of completed items.
+        #original, = AsyncTk().forward("get_order_info", ticket_no, "items")
+        #modified_order = []
+        #for ticket in original:
+        #    items = ticket[:6], ticket[6], ticket[7]        
+        #    for item in items:
+        #        if item[5].get("status") == TICKET_COMPLETE:
+        #            _item = MutableTicket(item)
+        #            null_ticket = MutableTicket(("", "", 0, {}, [], {}))
+        #            _item.data.extend((null_ticket, null_ticket))
+        #            modified_order.append(_item)
+        #
+        #
+        #if modified_order:
+        #    names = ", ".join(f"'{ticket.name}'" for ticket in modified_order)
+        #    logging.getLogger("main.POS.gui.stdout").info(
+        #        f"{names} cannot be removed. Modifying ticket instead..."
+        #    )
+        #    return AsyncTk().forward("modify_order", ticket_no, modified_order)
 
         AsyncTk().forward("cancel_order", ticket_no)
         if self.editor.ticket_no == ticket_no:
             self.editor.grid_remove()
             self.confirm_modify.grid_remove()
-    
+
     def on_cancel_return(self):
         self.cancel_button.lift()
         self.modify_button.lift()

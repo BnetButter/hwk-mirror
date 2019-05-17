@@ -1,4 +1,7 @@
-import functools
+from operator import itemgetter
+from time import localtime, strftime
+from Printer import Printer
+from CashDrawer import Drawer
 from lib import GUI_STDERR, GUI_STDOUT, output_message
 from lib import APPDATA
 from lib import TicketType
@@ -10,10 +13,7 @@ from POS import Order, NewOrder
 import collections
 import lib
 import decimal
-from operator import itemgetter
-from time import localtime, strftime
-from Printer import Printer
-import contextvars
+import functools
 import websockets
 import asyncio
 import json
@@ -33,6 +33,7 @@ class POSProtocol(POSInterface):
         self.test_network_connection()
         self.connect_task = self.connect()
         self.receipt_printer = Printer("/dev/null")
+        self.cash_drawer = Drawer()
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
         self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
 
@@ -91,6 +92,11 @@ class POSProtocol(POSInterface):
             
             if lib.DEBUG:
                 print("\n".join(line[0] for line in lines_conf))
+            
+            if payment_type == "Cash":
+                self.stdout.info("  Change Due: {:.2f}".format(change_due / 100))
+                self.cash_drawer.open()
+
             NewOrder()
         task.add_done_callback(callback)
             
@@ -103,13 +109,15 @@ class POSProtocol(POSInterface):
             if result:
                 if result["payment_type"] == "Cash":
                     message = message.format(ticket_no=_ticket_no, change_due="-" + "{:.2f}".format(result["total"] / 100))
+                    self.cash_drawer.open()
+                    if lib.DEBUG:
+                        print("drawer open...")
                 else:
-                    message = message.format(ticket_no=_ticket_no, change_due="-0.00")
-                
+                    message = message.format(ticket_no=_ticket_no, change_due=result["payment_type"])
                 self.stdout.info(message)
         task.add_done_callback(callback)
     
-    def modify_order(self, ticket_no, modified):
+    def modify_order(self, ticket_no, modified, *args):
         original_dct = self.order_queue[str(ticket_no)]
         total = 0
         for i, ticket in enumerate(modified):
@@ -118,7 +126,6 @@ class POSProtocol(POSInterface):
             modified[i][6] = list(ticket[6])
             modified[i][7] = list(ticket[7])
             
-        
         modified_dct = self.create_order(modified, 
                 total,
                 original_dct["payment_type"])
@@ -127,12 +134,18 @@ class POSProtocol(POSInterface):
         def callback(task):
             _ticket_no = "{:03d}".format(ticket_no)
             result, reason = task.result()
-
             if result:
                 message = "Modified ticket no. {} - Price difference: {}"
                 difference = "{:.2f}".format((total - original_dct["total"]) / 100)
-                # TODO log to sales.csv
-                self.stdout.info(message.format(_ticket_no, difference))         
+                if original_dct["payment_type"] == "Cash" and difference != "0.00":
+                    self.cash_drawer.open()
+                    if lib.DEBUG:
+                        print("opening cash drawer...")
+                
+                else:
+                    ...
+                
+                self.stdout.info(message.format(_ticket_no, difference))
             else:
                 self.stdout.critical(f"Failed to modify ticket no. {'{:03d}'.format(int(ticket_no))}. - {reason}")
 
