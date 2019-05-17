@@ -1,6 +1,5 @@
 from distutils.core import setup, Extension
 
-
 drawer_module = Extension("_cashdrawer", 
         sources=["drawermodule.c"],
         include_dirs=['.'],

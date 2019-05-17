@@ -398,7 +398,7 @@ static struct PyModuleDef cashdrawermodule = {
 /* Export function for the module (*must* be called PyInit_cashdrawer) */
 
 PyMODINIT_FUNC
-PyInit_cashdrawer(void)
+PyInit__cashdrawer(void)
 {
     return PyModuleDef_Init(&cashdrawermodule);
 }
