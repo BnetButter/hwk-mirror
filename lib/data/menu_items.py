@@ -179,6 +179,12 @@ DEFAULT_MENU = {
         "Drinks Included": [],
         "Two Sides": [
             "Dinners"
+        ],
+        "Register":["Drinks", "Snacks"],
+        "Payment Types":[
+            "Cash",
+            "Check",
+            "Invoice",
         ]
     }
 }

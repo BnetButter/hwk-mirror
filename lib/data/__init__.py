@@ -19,8 +19,8 @@ try:
         CONFIGDATA = load(fp)
 except:
     with open(CONFIGPATH, "w") as fp:
-        dump(DEFAULT_MENU, fp, indent=4)
-    CONFIGDATA = DEFAULT_MENU
+        dump(DEFAULT_CONFIG, fp, indent=4)
+    CONFIGDATA = DEFAULT_CONFIG
 
 DEBUG = CONFIGDATA["__debug"]
 
