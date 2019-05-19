@@ -263,5 +263,22 @@ class POSProtocol(POSInterface):
                 
             ]
         return subprocess.call(" ".join(args), shell=True)
+    
+    # should combine top and bottom function.
+    # but no receipt printer at the moment for testing.
+    # safer to just add another function and awk script.
+    def print_daily_sales(self):
+        day = 86400
+        current_time = int(time.time())
+        start_time = current_time - day
+        args = [
+            "awk ",
+            f"-vstart={start_time}",
+            f"-vend={current_time}",
+            "-f" + os.path.join(os.getcwd(), "POS/sales.awk "),
+            lib.SALESLOG + " ",
+            "> /dev/serial0"
+        ]
+        return subprocess.call(" ".join(args), shell=True)
 
     

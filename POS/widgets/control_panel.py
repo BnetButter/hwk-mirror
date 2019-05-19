@@ -36,6 +36,7 @@ class ToggleFrame(tk.Frame, metaclass=lib.WidgetType, device="POS"):
         label.grid(row=0, column=0, sticky="nswe")
         toggle.grid(row=0, column=1, sticky="nswe", ipadx=4)
 
+
 class ControlPanel(tk.Frame):
 
     def __init__(self, parent, **kwargs):
@@ -51,3 +52,10 @@ class ControlPanel(tk.Frame):
         button = lib.LabelButton(self, text="Print", command=command, font=ToggleFrame.font)
         label.grid(row=0, column=1, sticky="nswe", padx=3, pady=3)
         button.grid(row=0, column=2, sticky="nswe", padx=3, pady=3)
+    
+    def daily_sales_printer(self):
+        command=functools.partial(lib.AsyncTk().forward, "print_daily_sales")
+        label = tk.Label(self, text="Daily Sales", font=ToggleFrame.font)
+        button = lib.LabelButton(self, text="Print", command=command, font=ToggleFrame.font)
+        label.grid(row=1, column=1, sticky="nswe", padx=3, pady=3)
+        button.grid(row=1, column=2, sticky="nswe", padx=3, pady=3)

@@ -105,6 +105,7 @@ class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
         controlpanel = ControlPanel(self["control panel"])
         controlpanel.add_mode_toggle(MenuDisplay, MenuEditor)
         controlpanel.add_invoice_printer()
+        controlpanel.daily_sales_printer()
         controlpanel.grid(sticky="nswe", pady=2, padx=2)
         type(self).instance = self
 
