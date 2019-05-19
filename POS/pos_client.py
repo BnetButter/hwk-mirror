@@ -117,15 +117,29 @@ class POSProtocol(POSInterface):
                 self.stdout.info(message)
         task.add_done_callback(callback)
     
-    def modify_order(self, ticket_no, modified, change):
+    def modify_order(self, ticket_no, modified, change, difference):
         original_dct = self.order_queue[str(ticket_no)]
+        # check cash given is greater than difference only 
+        # if original payment type is cash.
+        if change == "- - -" \
+                and difference \
+                and original_dct["payment_type"] == "Cash":
+            return self.stdout.info("Cash given is less than difference")
+
+        try:
+            change = int(change.replace(".", ""))
+        except:
+            change = 0
+
         total = 0
         for i, ticket in enumerate(modified):
             total += self.get_total(ticket, ticket[6], ticket[7])
+            # MutableTicket object is not json serializable
+            # and im too lazy to add decoder/encoder function
             modified[i] = list(ticket)
             modified[i][6] = list(ticket[6])
             modified[i][7] = list(ticket[7])
-            
+
         modified_dct = self.create_order(modified, 
                 total,
                 original_dct["payment_type"])

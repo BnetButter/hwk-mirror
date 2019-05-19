@@ -530,13 +530,12 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         self.modify_button.lift()
     
     def on_modify_confirm(self, *args):
-        if self.editor.calculator.change_due.get() == "- - -"\
-                and self.editor.difference:
-            return AsyncTk().forward("stdout").info("Amount given is less than difference value")
         AsyncTk().forward("modify_order",
                 self.editor.ticket_no,
                 self.editor.create_order(),
-                self.editor.calculator.change)            
+                self.editor.calculator.change_due.get(),
+                self.editor.difference)
+     
         self.editor.grid_remove()
         self.confirm_modify.grid_remove()
 
