@@ -266,17 +266,20 @@ class POSProtocol(POSInterface):
         month = 2592000
         current_time = int(time.time())
         start_time = current_time - month
-        
-        args = [
-                "awk "
-                f"-vstart={start_time}",
-                f"-vend={current_time}",
-                "-f" + os.path.join(os.getcwd(), "POS/invoice.awk "),
-                lib.SALESLOG + " ",
-                "> /dev/serial0"
-                
-            ]
-        return subprocess.call(" ".join(args), shell=True)
+        for payment_type in (p for p in Order().payment_types if p != "Cash" and p != "Check"):
+            args = [
+                    "awk "
+                    f"-vstart={start_time}",
+                    f"-vend={current_time}",
+                    "-vpayment_type=" + payment_type,
+                    "-f" + os.path.join(os.getcwd(), "POS/invoice.awk "),
+                    lib.SALESLOG + " ",            
+                ]
+            
+            if not lib.DEBUG:
+                args.append("> /dev/serial0")
+
+            subprocess.call(" ".join(args), shell=True)
     
     # should combine top and bottom function.
     # but no receipt printer at the moment for testing.
@@ -291,8 +294,10 @@ class POSProtocol(POSInterface):
             f"-vend={current_time}",
             "-f" + os.path.join(os.getcwd(), "POS/sales.awk "),
             lib.SALESLOG + " ",
-            "> /dev/serial0"
         ]
+        
+        if not lib.DEBUG:
+            args.append("> /dev/serial0")
         return subprocess.call(" ".join(args), shell=True)
 
     

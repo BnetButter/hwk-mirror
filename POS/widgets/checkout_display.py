@@ -261,7 +261,7 @@ def labelentry(parent, text, variable, font=("Courier", 16), state=tk.DISABLED, 
 
 
 class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
-    font=("Courier", 16)
+    font=("Courier", 18)
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, widgettype=CheckoutTicketFrame)
@@ -293,15 +293,25 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
 
         
         self.calculator.update()
-    
+
         self.buttons = [
                 LabelButton(self.interior, payment_type, font=self.font) 
                 for payment_type in self.payment_types] # pylint:disable=E1101
         
         self.cash_button = None
-        
+        rowcount = 3
+        columncount = 0
         for i, button in enumerate(self.buttons):
-            button.grid(row=i + 3, column=0, columnspan=2, sticky="nswe", padx=10, pady=2)        
+            if i < 3:
+                button.grid(row=i + 3, column=0, columnspan=2, sticky="nswe", padx=10, pady=2)        
+            else:
+                button.configure(font=(self.font[0], self.font[1] + 2))
+                if columncount == 2:
+                    columncount = 0
+                    rowcount += 1
+                button.grid(row=rowcount+3, column=columncount, sticky="nswe", padx=10, pady=2)
+                columncount += 1
+            
             button.command = partial(ConfirmationWindow,
                     self.interior,
                     button["text"],
@@ -371,6 +381,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
             self.tickets[i]._update(ticket)
             self.tickets[i].grid(row=i + grid_offset + 3,
                     column=0,
+                    columnspan=2,
                     padx=10,
                     pady=5,
                     sticky="nswe")
