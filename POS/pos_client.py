@@ -10,6 +10,7 @@ from lib import POSInterface
 from lib import TICKET_QUEUED, TICKET_COMPLETE, TICKET_WORKING
 from lib import OrderInterface
 from POS import Order, NewOrder
+import POS
 import collections
 import lib
 import decimal
@@ -23,9 +24,11 @@ import subprocess
 import os
 import time
 
+
+
+
 class POSProtocol(POSInterface):
 
-    
     def __init__(self):
         super().__init__()
         self.network = False
@@ -36,6 +39,7 @@ class POSProtocol(POSInterface):
         self.cash_drawer = Drawer()
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
         self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
+    
 
     def get_ticket_no(self, result):
         if self.ticket_no is not None:
@@ -70,54 +74,134 @@ class POSProtocol(POSInterface):
             order_dct["print"] = lib.PRINT_NEW
         return order_dct
 
+    def _new_receipt_content(self, payment_type, cash_given, change_due):
+        lines_conf = [
+                ("{:03d}".format(self.ticket_no), Order().printer_style["ticket_no"]),
+                (time.strftime("%D %I:%M:%S %p", time.localtime()),
+                        {"justify":bytes('C', "utf-8")})]
+        
+        for order in Order():
+            lines_conf.extend(order.receipt())
+
+        fmter = "$ {:.2f}".format
+        print_strs = [
+            "Payment Type: "  + payment_type,
+            "  Cash Given: " + fmter(cash_given / 100),
+            "  Change Due: " + fmter(change_due / 100),
+            "Subtotal: "     + fmter(Order().subtotal / 100),
+            "     Tax: "     + fmter(Order().tax / 100),
+            "   Total: "     + fmter(Order().total / 100)
+        ]
+        
+        price_style = Order().printer_style["total"]
+        if payment_type == "Cash":
+            lines_conf.extend((line, price_style) for line in print_strs[:3])
+        else:
+            lines_conf.append((print_strs[0], price_style))
+
+        lines_conf.extend((line, price_style) for line in print_strs[3:])
+        return lines_conf
+
+    def _cancel_receipt_content(self, order, ticket_no):
+        lines_conf = [
+                ("CANCEL " + "{:03d}".format(int(ticket_no)), Order().printer_style["ticket_no"]),
+                (time.strftime("%D %I:%M:%S %p", time.localtime()),
+                        {"justify":bytes('C', "utf-8"), "size":bytes('S', "utf-8")})]
+        
+        price_style = Order().printer_style["total"]
+        lines_conf.append(("Payment Type: "  + order["payment_type"], price_style))
+        lines_conf.append(("  Change Due: " + "{:.2f}".format(order["total"] / 100), price_style))
+        return lines_conf
+
+    def _modify_receipt_content(self, original_order,
+            new_order, cash_given, change_due, difference) -> (list, int):
+        
+        lines_conf = [
+                ("MODIFY " + "{:03d}".format(self.ticket_no), Order().printer_style["ticket_no"]),
+                (time.strftime("%D %I:%M:%S %p", time.localtime()),
+                        {"justify":bytes('C', "utf-8"), "size":bytes('S', "utf-8")},
+                ("[original]", {})),
+        ]
+
+        item_difference_count = 0
+        for original, new in zip(original_order["items"], new_order):
+            original = Order().convert_to(*original)
+            line, diff = Order().compare(original, new)
+            item_difference_count += diff
+            lines_conf.extend((l, Order().printer_style["item"]) for l in line)
+    
+        price_style = Order().printer_style["total"]
+        payment_type = original_order["payment_type"]
+        lines_conf.append(("Difference  : " + "{:.2f}".format(difference / 100), price_style))
+        lines_conf.append(("Payment Type: "  + payment_type, price_style))
+        if payment_type == "Cash":
+            lines_conf.append(("  Cash Given: " + "{:.2f}".format(cash_given / 100), price_style))
+            lines_conf.append(("  Change Due: " + "{:.2f}".format(difference / 100), price_style))
+        
+        return lines_conf, item_difference_count
+    
+
+    async def print_receipt(self, receipt):
+        if lib.DEBUG:
+            print("\n".join(line[0] for line in receipt))
+        
+        for line in receipt:
+            self.receipt_printer.writeline(line[0], **line[1])
+            await asyncio.sleep(1/60)
+        self.receipt_printer.writeline("\n\n\n")
+        await asyncio.sleep(1/60)
+
     def new_order(self, payment_type, cash_given, change_due):
         order_dct = self._new_order(
                 payment_type, cash_given, change_due)
-        
-        task = self.loop.create_task(self.server_message("new_order", order_dct))
+            
+        if payment_type == "Cash":
+            self.stdout.info("({})  Change Due: {:.2f}".format(self.ticket_no, change_due / 100))
+            self.cash_drawer.open()
 
+        receipt = self._new_receipt_content(payment_type, cash_given, change_due)
+        # unblocks printer.writeline
+        self.loop.create_task(self.print_receipt(receipt))
+        task = self.loop.create_task(self.server_message("new_order", order_dct))
+        NewOrder()
         def callback(task):
             ticket_no = task.result()
             ticket_no = "{:03d}".format(ticket_no)
             self.stdout.info(f"Received ticket no. {ticket_no}")
-            lines_conf = [(ticket_no, Order().printer_style["ticket_no"])]
 
-            for order in Order():
-                lines_conf.extend(order.receipt())
-            lines_conf.append(("Total: " + "$ {:.2f}".format(Order().total / 100), 
-                    Order().printer_style["total"]))
-            for line in lines_conf:
-                self.receipt_printer.writeline(line[0], **line[1])
-            self.receipt_printer.writeline("\n\n\n")
-            
-            if lib.DEBUG:
-                print("\n".join(line[0] for line in lines_conf))
-            
-            if payment_type == "Cash":
-                self.stdout.info("  Change Due: {:.2f}".format(change_due / 100))
-                self.cash_drawer.open()
-
-            NewOrder()
         task.add_done_callback(callback)
-            
+
     def cancel_order(self, ticket_no):
+        # check if order still exists serverside
+        order = self.order_queue.get(str(ticket_no))
+        if order is None:
+            return self.stdout.warning("Cannot find ticket no. {:03d}".format(ticket_no))
+        
+        assert isinstance(order, dict)
+        message = "Cancelled ticket no. {:03d}, Change Due: {}"
+        
+        if order["payment_type"] == "Cash":
+            self.cash_drawer.open()
+            message = message.format(ticket_no, order["total"])
+            if lib.DEBUG:
+                print("drawer open... ")
+        else:
+            message = message.format(ticket_no, order["payment_type"])
+        self.stdout.info(message)
+        
+        # print receipt
+        cancel_receipt = self._cancel_receipt_content(order, ticket_no)
+        self.loop.create_task(self.print_receipt(cancel_receipt))
         task = self.loop.create_task(self.server_message("cancel_order", ticket_no))
+
         def callback(task):
-            _ticket_no = "{:03d}".format(ticket_no)
-            result = task.result()
-            message = "Cancelled ticket no. {ticket_no}, Change Due: {change_due}"
-            if result:
-                if result["payment_type"] == "Cash":
-                    message = message.format(ticket_no=_ticket_no, change_due="-" + "{:.2f}".format(result["total"] / 100))
-                    self.cash_drawer.open()
-                    if lib.DEBUG:
-                        print("drawer open...")
-                else:
-                    message = message.format(ticket_no=_ticket_no, change_due=result["payment_type"])
-                self.stdout.info(message)
+            if task.result():
+                self.stdout.info("Cancel success")
+            else:
+                self.stdout.info("Cancel failure")
         task.add_done_callback(callback)
-    
-    def modify_order(self, ticket_no, modified, change, difference):
+
+    def modify_order(self, ticket_no, modified, cash_given, change, difference):
         original_dct = self.order_queue[str(ticket_no)]
         # check cash given is greater than difference only 
         # if original payment type is cash.
@@ -126,11 +210,24 @@ class POSProtocol(POSInterface):
                 and original_dct["payment_type"] == "Cash":
             return self.stdout.info("Cash given is less than difference")
 
+        cash_given = int(cash_given.replace(".", ""))
         try:
             change = int(change.replace(".", ""))
         except:
             change = 0
 
+        # shows changes made to original order if changes were made
+        # otherwise shows original order
+        modify_receipt, changes_made_cnt = self._modify_receipt_content(
+                    original_dct,
+                    modified,
+                    cash_given,
+                    change,
+                    difference)
+     
+        if not changes_made_cnt:            
+            return self.stdout.info("No changes made to ticket no. {:03d}".format(int(ticket_no)))
+        
         total = 0
         for i, ticket in enumerate(modified):
             total += self.get_total(ticket, ticket[6], ticket[7])
@@ -140,38 +237,45 @@ class POSProtocol(POSInterface):
             modified[i][6] = list(ticket[6])
             modified[i][7] = list(ticket[7])
 
-        modified_dct = self.create_order(modified, 
+        modified_dct = self.create_order(modified,
                 total,
                 original_dct["payment_type"])
         
+        modified_dct["print"] = lib.PRINT_MOD
+        # print message to console
+        message = "Modified ticket no. {} - Price difference: {}"
+        difference = "{:.2f}".format((total - original_dct["total"]) / 100)
+        self.stdout.info(message.format(ticket_no, difference))
+
+        # open cash drawer if necessary
+        if original_dct["payment_type"] == "Cash"\
+                        and difference != "0.00" \
+                        and change:
+            self.stdout.info("  Change Due: {:.2f}".format(change / 100))
+            self.cash_drawer.open()
+            if lib.DEBUG:
+                print("drawer open...")
+        
+        # create non-blocking print task
+        self.loop.create_task(self.print_receipt(modify_receipt))
+        
+        # send server request
         task = self.loop.create_task(self.server_message("modify_order", (ticket_no, modified_dct)))
+    
         def callback(task):
             _ticket_no = "{:03d}".format(ticket_no)
             result, reason = task.result()
             if result:
-                message = "Modified ticket no. {} - Price difference: {}"
-                difference = "{:.2f}".format((total - original_dct["total"]) / 100)
-                self.stdout.info(message.format(_ticket_no, difference))
-                # only open drawer if necessary
-                if original_dct["payment_type"] == "Cash"   \
-                        and difference != "0.00"            \
-                        and change:
-                    self.cash_drawer.open()
-                    if lib.DEBUG:
-                        print("opening cash drawer...")
-                    self.stdout.info("  Change Due: {:.2f}".format(change / 100))
+                self.stdout.info("Server received modify request")
             else:
-                self.stdout.critical(f"Failed to modify ticket no. {'{:03d}'.format(int(ticket_no))}. - {reason}")
+                self.stdout.critical(f"Server failed to execute modify request - '{reason}'")
         task.add_done_callback(callback)
+
     def get_order_info(self, ticket_no, *args):
         if args:
             return (self.order_queue[str(ticket_no)].get(arg) for arg in args)
         return ()
-    
-    def remove_completed(self):
-        self.loop.create_task(
-                self.server_message("remove_completed", None))
-    
+
     def edit_menu(self, new_menu):
         task = self.loop.create_task(
                 self.server_message("edit_menu", new_menu))
@@ -272,7 +376,7 @@ class POSProtocol(POSInterface):
                     f"-vstart={start_time}",
                     f"-vend={current_time}",
                     "-vpayment_type=" + payment_type,
-                    "-f" + os.path.join(os.getcwd(), "POS/invoice.awk "),
+                    "-f" + os.path.join(os.getcwd(), "hwk/POS/invoice.awk "),
                     lib.SALESLOG + " ",            
                 ]
             
@@ -292,7 +396,7 @@ class POSProtocol(POSInterface):
             "awk ",
             f"-vstart={start_time}",
             f"-vend={current_time}",
-            "-f" + os.path.join(os.getcwd(), "POS/sales.awk "),
+            "-f" + os.path.join(os.getcwd(), "hwk/POS/sales.awk "),
             lib.SALESLOG + " ",
         ]
         
@@ -300,4 +404,5 @@ class POSProtocol(POSInterface):
             args.append("> /dev/serial0")
         return subprocess.call(" ".join(args), shell=True)
 
-    
+    def open_drawer(self):
+        self.cash_drawer.open()

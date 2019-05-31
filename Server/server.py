@@ -5,14 +5,19 @@ import operator
 import lib
 import asyncio
 import subprocess
+import collections
 
 class Server(ServerInterface):
-    
+        
     def __init__(self):
         super().__init__()
         self.salesinfo = lib.SalesInfo(lib.SALESLOG)
-        self.loop.create_task(self.cleanup())
-
+        self.canceled_tickets = asyncio.Queue()
+        self.completed_tickets = asyncio.Queue()
+        self.loop.create_task(self.remove_cancelled())
+        self.loop.create_task(self.remove_completed())
+        self.loop.create_task(self.set_completed())
+    
     async def new_order(self, ws, data):
         self.order_queue[self.ticket_no] = data
         await ws.send(json.dumps({"result":self.ticket_no}))
@@ -24,21 +29,45 @@ class Server(ServerInterface):
         await ws.send(json.dumps({"result": (True, None)}))
 
     async def cancel_order(self, ws, data):
-        # set order status as complete        
+        # set order status as complete
         ticket = self.order_queue[data]
-        await ws.send(json.dumps({"result":ticket}))
+        await self.canceled_tickets.put(data)
         self.order_queue[data]["print"] = lib.PRINT_NUL
-        await asyncio.sleep(5)
-        self.order_queue.pop(data)
-    
+        await ws.send(json.dumps({"result":ticket}))
+
+    async def set_completed(self):
+        while True:
+            for ticket in self.order_queue:
+                if self.order_complete(self.order_queue[ticket]["items"]):
+                    await self.completed_tickets.put(ticket)
+            await self.completed_tickets.join()
+            await asyncio.sleep(1/30)
+        
+    async def remove_completed(self):
+        while True:
+            number = await self.completed_tickets.get()
+            while self.order_queue[number]["print"]:
+                await asyncio.sleep(1/60)
+            self.logger.info("completed ticket no. {:03d}".format(number))
+            self.salesinfo.write(self.order_queue.pop(number))
+            self.completed_tickets.task_done()
+
+    async def remove_cancelled(self):
+        while True:
+            number = await self.canceled_tickets.get()
+            while self.order_queue[number]["print"]:
+                await asyncio.sleep(1/60)
+            self.order_queue.pop(number)
+            self.canceled_tickets.task_done()
+
     async def modify_order(self, ws, data):
         ticket_no, modified = data
         if ticket_no not in self.order_queue:
             await ws.send(json.dumps({"result":(False, f"ticket no. {ticket_no} does not exist")}))
         else:
             self.order_queue[ticket_no] = modified
-            self.order_queue[ticket_no]["print"] = lib.PRINT_MOD
             await ws.send(json.dumps({"result":(True, None)}))
+
 
     async def set_ticket_status(self, ws, data):
         ticket_no, nth_ticket, value = data
@@ -76,13 +105,7 @@ class Server(ServerInterface):
             return await ws.send(json.dumps({"result": (False, f"Cannot set status of empty ticket")}))
         item[5]["status"] = value
         return await ws.send(json.dumps({"result":(True, None)}))
-
-    async def remove_completed(self, ws, data):    
-        for ticket_no in self.order_queue:
-            if self.order_complete(self.order_queue[ticket_no]["items"]):
-                self.salesinfo.write(self.order_queue.pop(ticket_no))
-        return await ws.send(json.dumps({"result": (True, "")}))
-    
+        
     @staticmethod
     def order_complete(items):
         valid_items = (item 
@@ -91,13 +114,6 @@ class Server(ServerInterface):
                         if item[1])
         return all(item[5].get("status") == lib.TICKET_COMPLETE
                 for item in valid_items)
-
-    async def cleanup(self):
-        while True:
-            await asyncio.sleep(1/30)
-            for ticket_no in self.order_queue:
-                if self.order_complete(self.order_queue[ticket_no]["items"]):
-                    self.salesinfo.write(self.order_queue.pop(ticket_no))
 
     async def get_time(self, ws, data):
         await ws.send(json.dumps({"result":(True, int(datetime.now()))}))
@@ -129,5 +145,3 @@ class Server(ServerInterface):
     
     async def extract(self, ws, data):
         await ws.send(json.dumps({"result": self.salesinfo.data()}))
-
-    

@@ -85,11 +85,12 @@ class SingletonMenu(lib.SingletonType, lib.MenuType):
 # So this should minimize error and the amount of screen taps needed to
 # add an order to the global Order() list
 
-class _OrderNagivator(metaclass=SingletonMenu):
+class _OrderNagivator(tk.Frame, metaclass=SingletonMenu):
     null = lib.MenuItem("", "", 0, {})
 
     def __init__(self, tabframe, **kwargs):
         assert isinstance(tabframe, lib.TabbedFrame)
+        super().__init__(tabframe)
         self.parent = tabframe
         self.counter = 0
         self.select = functools.partial(lib.TabbedFrame.select, tabframe)
@@ -137,11 +138,9 @@ class _OrderNagivator(metaclass=SingletonMenu):
         except:
             self.create_ticket()
     
-
     def remove_item(self):
         self.items[self.counter] = type(self).null
         self.counter -= 1
-        
 
     def update_ticket(self):
         try:
@@ -158,6 +157,11 @@ class _OrderNagivator(metaclass=SingletonMenu):
         OptionsEditor(self.parent)
         self.reset()
     
+    def destroy(self):
+        type(self).instance = None
+        super().destroy()
+
+
 def OrderNavigator(parent=None, **kwargs):
     return _OrderNagivator(parent, **kwargs)
 
@@ -200,7 +204,7 @@ class OpenCharge(tk.Frame, metaclass=lib.MenuWidget, device="POS"):
         self.button.grid(row=0, column=0, sticky="nswe")
         self.price_input.grid(row=0, column=1, sticky="nswe")
 
-        self.update()
+        self.update_func = self.update()
 
     def add_item(self):
         price = int(self.price_input.value)
@@ -209,6 +213,10 @@ class OpenCharge(tk.Frame, metaclass=lib.MenuWidget, device="POS"):
             OrderNavigator().add_item(
                 lib.MenuItem(*item))
     
+    def destroy(self):
+        lib.AsyncTk().remove(self.update_func)
+        super().destroy()
+
     @lib.update
     def update(self):
         price = int(self.price_input.value)
@@ -226,9 +234,12 @@ class NullItem(lib.LabelButton, metaclass=lib.WidgetType, device="POS"):
                 font=type(self).font,
                 command=OrderNavigator().add_item,
                 **kwargs)
-        self.update()
-
-
+        self.update_func = self.update()
+    
+    def destroy(self):
+        lib.AsyncTk().remove(self.update_func)
+        super().destroy()
+    
     @lib.update
     def update(self):
         if not OrderNavigator().counter:
@@ -265,7 +276,7 @@ class CategoryFrame(lib.ScrollFrame, metaclass=lib.MenuType):
                 self.interior.grid_rowconfigure(row, weight=1)
                 column = 0
                 row += 1
-                continue
+
             button.grid(
                     row=row + 1,
                     column=column,

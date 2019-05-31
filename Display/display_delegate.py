@@ -143,8 +143,13 @@ class DisplayProtocol(lib.DisplayInterface):
 
         async def _print_tickets():
             while True:
+                processed = set()
                 for ticket in self.ticket_generator:
                     ticket, status, cnt = ticket
+                    if ticket.ticket_no not in processed:
+                        await self.server_message("set_ticket_printed", ticket.ticket_no)
+                        processed.add(ticket.ticket_no)
+                
                     line_opt = ticket.ticket_receipt(status, cnt)
                     for line, opt in line_opt:
                         self.ticket_printer.writeline(line, **opt)
@@ -152,8 +157,6 @@ class DisplayProtocol(lib.DisplayInterface):
                     self.ticket_printer.writeline("\n\n\n", **NULL_OPT)
                     if lib.DEBUG:
                         print("\n".join(line[0] for line in line_opt))
-
-                    await self.server_message("set_ticket_printed", ticket.ticket_no)
                 await asyncio.sleep(1/30)
 
         def print_tickets(task):

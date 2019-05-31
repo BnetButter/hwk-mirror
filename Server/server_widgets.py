@@ -9,7 +9,7 @@ import subprocess
 import asyncio
 
 class ServerTime(tk.Frame, metaclass=WidgetType, device="Server"):
-    font = ("Courier", 14)
+    font = ("Courier", 20)
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         label = tk.Label(self, text="Current Time: ", font=self.font)
@@ -33,7 +33,7 @@ symbol = lambda parent, symbol, **kwargs: tk.Label(parent, text=symbol, **kwargs
 
 class TimeVariable(tuple):
 
-    def __new__(cls, parent, font=("Courier", 14)):
+    def __new__(cls, parent, font=("Courier", 18)):
 
         lc = localtime()
         year = int(lc[0]) - 5
@@ -70,7 +70,7 @@ class TimeVariable(tuple):
         return super().__new__(cls, (month, day, year, hour, minute, ampm))
 
 class EditTime(tk.Frame, metaclass=WidgetType, device="Server"):
-    font=("Courier", 12)
+    font=("Courier", 20)
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.variables = TimeVariable(self)
@@ -80,7 +80,7 @@ class EditTime(tk.Frame, metaclass=WidgetType, device="Server"):
             label.grid(row=0, column=i, sticky="w")
             self.variables[i].grid(row=1, column=i, sticky="w")
 
-        confirm = LabelButton(self, "Set Time", command=self.set_time)
+        confirm = LabelButton(self, "Set Time", command=self.set_time, font=self.font)
         confirm.grid(row=1, column=6)
 
     def set_time(self):
@@ -126,25 +126,22 @@ class EditTime(tk.Frame, metaclass=WidgetType, device="Server"):
     def ampm(self):
         return self.variables[5].get()
 
+
 class ServerTimeApp(tk.Tk):
     loop = asyncio.get_event_loop()
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         current_time = ServerTime(self, bd=2)    
         current_time.grid(row=0, column=0, pady=5, padx=5, sticky="nswe")
         edittime = EditTime(self)
-        button = LabelButton(self, text="Edit", 
-                command=partial(edittime.grid, 
-                        row=1,
-                        column=0,
-                        pady=5,
-                        padx=5), font=current_time.font)
-
-        button.grid(row=0, column=1, pady=5, padx=5, sticky="nswe")
-        confirm = LabelButton(self, text="Confirm", bg="green", command=self.destroy)
-        confirm.grid(row=2, column=0)
-
+        edittime.grid(row=1, column=0, pady=5, padx=5, sticky="nswe")
+        confirm = LabelButton(self, text="Confirm", bg="green", command=self.destroy, font=current_time.font)
+        confirm.grid(row=1, column=1, pady=5, padx=5, sticky="swe")
         self.current_time = current_time
+        self.configure(bd=10)
+        self.resizable(width=False, height=False)
+        self.wm_title("Set Time")
 
     def mainloop(self):
         async def mainloop():

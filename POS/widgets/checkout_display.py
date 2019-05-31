@@ -296,7 +296,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
 
         self.buttons = [
                 LabelButton(self.interior, payment_type, font=self.font) 
-                for payment_type in self.payment_types] # pylint:disable=E1101
+                for payment_type in type(self).payment_types] # pylint:disable=E1101
         
         self.cash_button = None
         rowcount = 3

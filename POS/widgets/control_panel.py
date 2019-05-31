@@ -59,3 +59,10 @@ class ControlPanel(tk.Frame):
         button = lib.LabelButton(self, text="Print", command=command, font=ToggleFrame.font)
         label.grid(row=1, column=1, sticky="nswe", padx=3, pady=3)
         button.grid(row=1, column=2, sticky="nswe", padx=3, pady=3)
+    
+    def open_drawer(self):
+        label = lib.LabelButton(self,
+                    text="Open Drawer",
+                    font=ToggleFrame.font, 
+                    command=functools.partial(lib.AsyncTk().forward, "open_drawer"))
+        label.grid(row=0, column=3, sticky="nswe", padx=3, pady=3, ipadx=5)

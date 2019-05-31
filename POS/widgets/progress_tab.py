@@ -533,6 +533,7 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         AsyncTk().forward("modify_order",
                 self.editor.ticket_no,
                 self.editor.create_order(),
+                self.editor.calculator.cash_given.get(),
                 self.editor.calculator.change_due.get(),
                 self.editor.difference)
      

@@ -61,10 +61,6 @@ def __str__(self):
     addon1, addon2 = set_price(self)
     lines = [line_fmt(self.name, self.price)]
     lines.extend(f"    + {option}" for option in self.selected_options)
-
-    
-    
-
     if self.addon1.name:
         lines.append(line_fmt("  " + self.addon1.name, self.addon1.price * bool(addon1[2])))
         lines.extend([f"    + {option}" for option in self.addon1.selected_options])
@@ -81,11 +77,11 @@ receipt_printer_style = {
     },
 
     "item": {
-        "size": bytes('M', "utf-8"),
+        "size": bytes('S', "utf-8"),
     },
     "total": {
-        "justify":bytes('R', "utf-8"),
-        "size": bytes('L', "utf-8"),
+        "justify":bytes('L', "utf-8"),
+        "size": bytes('S', "utf-8"),
     },
 }
 
@@ -159,7 +155,6 @@ def receipt(self) -> str:
     lines.append(("\n", NULL_DICT)) # need a newline to start printing
     return lines
 
-@log_info("Created new order", time=True)
 def NewOrder():
     return OrderInterface("Orders", (Ticket,), {
         "__new__": new,
@@ -170,9 +165,8 @@ def NewOrder():
         "parameters":parameters,
         "receipt":receipt,
         "printer_style": receipt_printer_style})
-
+     
 def Order():
     if OrderInterface.instance is None:
         return NewOrder()
     return OrderInterface.instance
-

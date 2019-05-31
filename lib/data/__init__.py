@@ -48,6 +48,7 @@ class _TicketStatus(int):
 TICKET_QUEUED = _TicketStatus(-1)
 TICKET_WORKING = _TicketStatus(0)
 TICKET_COMPLETE = _TicketStatus(1)
+TICKET_CANCELLED = 2
 
 PRINT_NEW = 1
 PRINT_MOD = 2

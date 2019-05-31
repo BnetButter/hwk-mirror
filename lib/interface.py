@@ -84,6 +84,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         self.ticket_no = 1
         self.shutdown_now = False
         self.coroutine = self.coroutine_switch()
+        self.logger = logger
 
     async def on_connect(self, ws, client_id) -> tuple:
         """create a websocket server object connected to port"""
@@ -162,7 +163,6 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
             "edit_menu": self.edit_menu,
             "modify_order": self.modify_order,
             "cancel_order":self.cancel_order,
-            "remove_completed":self.remove_completed,
             "get_menu": self.get_menu,
         }
         display = {
@@ -170,7 +170,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
             "set_ticket_status": self.set_ticket_status,
             "set_order_status": self.set_order_status,
             "set_item_status": self.set_item_status,
-            "set_ticket_printed": self.set_ticket_printed
+            "set_ticket_printed": self.set_ticket_printed,
         }
 
         extern = {
@@ -203,6 +203,8 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
 
         return task
     
+
+
     @abstractmethod
     async def new_order(self):
         ...
@@ -279,7 +281,6 @@ class ClientInterface(GlobalState):
             await ws.send(json.dumps({"client_id":self.client_id, "request":request, "data":data}))
             return json.loads(await ws.recv())["result"]
 
-
     def create_task(self, task):
         task = self.loop.create_task(task)
         self.tasks.append(task)
@@ -294,28 +295,42 @@ class ClientInterface(GlobalState):
         return wrapper
     
     def connect(self):
-        @self.append
-        async def coroutine():
-            async with websockets.connect(address) as ws:
-                port = await self.server_message("connect", None)
-                if not port:
-                    # stderr.error("ERROR: Server host failed to assign update server")
-                    raise Exception("Server host failed to assign update server")
 
-            async with websockets.connect(f"ws://{device_ip}:{port}") as ws:
-                self.connected = True
-                while True:
-                    if self.connected:
-                        await ws.send("update")
-                        self.loads(await ws.recv())
-                        await asyncio.sleep(1/30)
-                    else:
-                        await ws.send("disconnect")
-                        self.loads(await ws.recv())
-                        break
-            return await self.server_message("disconnect", None)
+        # if server is not online when client starts, wait for server
+        async def get_port():
+            while True:
+                try:
+                    return await self.server_message("connect", None)
+                except:
+                    await asyncio.sleep(1)
+
+        @self.append
+        async def coroutine():    
+            while True:
+                try:
+                    task = self.loop.create_task(get_port())
+                    result = await asyncio.wait({task})
+                    assert task in result[0]
+                    self.connected = True
+                    ws = await websockets.connect(f"ws://{device_ip}:{task.result()}")
+                    while True:
+                        if self.connected:
+                            await ws.send("update")
+                            self.loads(await ws.recv())
+                            await asyncio.sleep(1/30)
+                        else:
+                            # tell update handler to stop
+                            await ws.send("disconnect")
+                            self.loads(await ws.recv())
+                            break
+                    # tell server handler to do cleanup
+                    return await self.server_message("disconnect", None)
+                except:
+                    self.connected = False
+                finally:
+                    await asyncio.sleep(1)
         return coroutine()
-        
+
     def disconnect(self, *args):
         self.connected = False
 
@@ -392,6 +407,3 @@ class DisplayInterface(ClientInterface):
     @abstractmethod
     def set_order_status(self):
         ...
-    
-
-    

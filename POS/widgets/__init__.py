@@ -12,12 +12,12 @@ from .checkout_display import *
 from .network_status import NetworkStatus
 from .titlebar import *
 from .progress_tab import *
-from .order import Order, NewOrder
+from .order import Order, NewOrder, receipt
 from .control_panel import *
 
 
 class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
-    tabfont = ("Courier", 14)
+    tabfont = ("Courier", 16)
     
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
@@ -55,14 +55,14 @@ class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
 
 
 class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
-    tabfont = ("Courier", 14)
+    tabfont = ("Courier", 18)
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.style.configure("MenuDisplay.TNotebook.Tab",
                 font=self.tabfont,
                 padding=5)
         self.navigator = OrderNavigator(parent=self)
-        self.navigator.update()
+        self.nav_update_func = self.navigator.update()
         self._notebook.configure(style="MenuDisplay.TNotebook")
         for category in MenuDisplay.categories:
             self[category] = CategoryFrame(self, category)
@@ -72,7 +72,10 @@ class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
     def set_keypress_bind(self, orderdisplay):
         for frame in self.data.values():
             frame.set_keypress_bind(lib.AsyncTk(), self, orderdisplay, "Orders")
-
+    
+    def dtor(self):
+        lib.AsyncTk().remove(self.nav_update_func)
+      
 class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
     tabfont = ("Courier", 10)
     instance = None
@@ -106,6 +109,7 @@ class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
         controlpanel.add_mode_toggle(MenuDisplay, MenuEditor)
         controlpanel.add_invoice_printer()
         controlpanel.daily_sales_printer()
+        controlpanel.open_drawer()
         controlpanel.grid(sticky="nswe", pady=2, padx=2)
         type(self).instance = self
 
@@ -143,10 +147,7 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
 
     def ctor(self):
         self.update()
-
-    def dtor(self):
-        lib.AsyncTk().remove(self.update_task)
-
+    
     def update(self):
         @lib.update
         def update():
