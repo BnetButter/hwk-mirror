@@ -1,11 +1,9 @@
 # HWK-System
 
 Copyright (C) 2018-2019 Heifers with a kick LLC
-
 Author: Ziyu (Kevin) Lai
 
-
-Hardware Devices:
+Devices:
 
 1. POS
     - Raspberry Pi 3 B+
@@ -21,61 +19,18 @@ Hardware Devices:
 
 4. External data transfer device*
 
-High level policies and Device purposes
+5. 2x Adafruit Thermal Printers
 
-The server host may run several WebSocketServer objects. The primary server delegates one-off requests
-to subroutines. These requests include placing an order, editing an order, completing an order, etc.
-Any additional server objects are instantiated to issue continuous updates to connected clients.
+6. Cash drawer (modified Epson RJ11 interface)
 
-1. The POS device runs two independent processes. 
-    - websockets server host
-    - POS GUI client.
-    
-    Server host
-    
-    - creates a shared global state between POS device and Display device
+Patch Notes 3.01.001
+Features
+    - added a button to "Control Panel" console tab that opens the cash drawer
+    - POS receipt printer will print without a server connection.
+    - Client devices can now freely connect/disconnect from the server.
+        
 
-    - provides an interface for clients to modify global state such as
-
-        - adding an order from the POS
-        - marking an order as complete from Display
-        - editing the menu from the POS
-        - editing queued orders from POS
-        - Time
-    - Record keeper. Writes order information to file with info including
-
-        - time of sale
-        - payment type
-        - items ordered
-        - total, subtotal, tax
-        - Transferring saved data
-
-        Due to lack of internet access, the server host provides an interface for
-        transferring sales data over LAN to an external device
-    
-    - Determines system time
-
-        Since Raspberry Pi's do not have an onboard battery, cutting power to RPI
-        for extended periods of time will change system time. A GUI interface is provided for the user
-        to change system time if necessary.
-
-2. POS
-    - The GUI provides an interface to 
-        - create orders
-        - cancel orders
-        - edit orders
-
-        - edit menu
-        - global system shutdown
-
-    - GUI widgets do not communicate with the server directly. Requests are forwarded to
-      a client delegate object which exposes an interface to communicate with the server.
-
-3. Display
-
-    - The Display GUI exposes relevant information to the cook line,
-      as well as an interface to mark an order as complete and
-      advancing the queue. 
-    
-    - As with the POS, it does not interact with the server directly.
-      all requests are forwarded to its own client delegate.
+Bug Fixes
+    - Fixed an issue where cancelling an order on the POS resulted in failure to log all subsequent orders.
+    - Fixed an issue where 'reinstancing' menu selection widget broke the OrderNavigator
+    - Fixed an issue where not all menu items were displayed on menu selection widget.
