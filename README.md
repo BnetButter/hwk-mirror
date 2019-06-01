@@ -23,14 +23,26 @@ Devices:
 
 6. Cash drawer (modified Epson RJ11 interface)
 
-Patch Notes 3.01.001
-Features
-    - added a button to "Control Panel" console tab that opens the cash drawer
-    - POS receipt printer will print without a server connection.
-    - Client devices can now freely connect/disconnect from the server.
-        
+Patch Notes 3.01.003
+    General
+        - updated readme patch notes.
 
-Bug Fixes
-    - Fixed an issue where cancelling an order on the POS resulted in failure to log all subsequent orders.
-    - Fixed an issue where 'reinstancing' menu selection widget broke the OrderNavigator
-    - Fixed an issue where not all menu items were displayed on menu selection widget.
+Patch Notes 3.01.002
+    Features
+        - Added payment type editor. Accessible by cycling through "Menu Modes" on control panel. Note that unlike the Menu Editor which can be reinstanced to original state, the Reset button has no effect on payment type editor frame. Save and Apply still works as usual.
+        - "Menu Mode" button is now much more versatile. It will lift any SingletonType class objects passed into its constructor. Or any class with a "instance" class attribute.
+
+    General
+        - ReinstanceType __call__ method has been changed. Previously it destroyed the instance. Now it only destroys the instance's children     before calling instance.__init__
+        - Buttons on the Checkout tab for selecting a payment type has been extracted to its own class. Since payment types can now be edited, a new class (instance of ReinstanceType) was needed to reflect the changes in payment type.
+
+Patch Notes 3.01.001
+    Features
+        - added a button to "Control Panel" console tab that opens the cash drawer
+        - POS receipt printer will print without a server connection.
+        - Client devices can now freely connect/disconnect from the server.
+        
+    Bug Fixes
+        - Fixed an issue where cancelling an order on the POS resulted in failure to log all subsequent orders.
+        - Fixed an issue where 'reinstancing' menu selection widget broke the OrderNavigator
+        - Fixed an issue where not all menu items were displayed on menu selection widget.
