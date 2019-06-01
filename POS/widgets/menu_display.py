@@ -26,7 +26,8 @@ class _EditOptions(tk.Frame, metaclass=lib.WidgetType, device="POS"):
         self.item.selected_options = (option["text"] for option in self.options if option)
 
 
-class OptionsEditor(tk.Toplevel, metaclass=lib.ToplevelType):
+class OptionsEditor(tk.Toplevel, metaclass=lib.ToplevelWidget, device="POS"):
+    font=()
 
     def __new__(cls, parent, **kwargs):
         ticket = Order()[-1]

@@ -23,6 +23,13 @@ Devices:
 
 6. Cash drawer (modified Epson RJ11 interface)
 
+Patch Notes 3.01.004
+    Bug Fix:
+        - Fixed bug where Toplevel widgets did not appear at the center of the screen as intended.
+    General:
+        - Removed 'ToplevelType' metaclass from lib.metaclass. 
+        - Previously, ToplevelWidget subclassed MenuWidget and ToplevelType. ToplevelWidget now only subclasses only lib.MenuWidget.
+
 Patch Notes 3.01.003
     General
         - updated readme patch notes.

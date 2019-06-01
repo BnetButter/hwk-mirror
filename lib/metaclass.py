@@ -310,13 +310,16 @@ class OrderInterface(TicketType, MenuType, UserList):
     @property
     def tax(self)->int:
         return self.total - self.subtotal
+    
+# resolve metaclas conflict
+class MenuWidget(WidgetType, MenuType): ...
 
-
-class ToplevelType(type):
+class ToplevelWidget(MenuWidget):
     """Centers toplevel window"""
 
     @staticmethod
     def center(result):
+        result.update()
         screen_center_X, screen_center_Y = (            
                 int(result.winfo_screenwidth() / 2),
                 int(result.winfo_screenheight() / 2))
@@ -334,16 +337,6 @@ class ToplevelType(type):
         if result is not None:
             result.attributes("-topmost", True)
             return self.center(result)
-        
-# resolve metaclas conflict
-class MenuWidget(WidgetType, MenuType): ...
-
-
-class ToplevelWidget(MenuWidget, ToplevelType):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        ToplevelType.__init__(self, *args, **kwargs)
-
 
 class ReinstanceType(MenuWidget):
     objects = list()
