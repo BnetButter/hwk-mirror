@@ -2,50 +2,58 @@ import tkinter as tk
 import lib
 import functools
 
-class ToggleMenuMode(lib.ToggleSwitch):
+class FrameSwitch(lib.LabelButton):
 
-    def __init__(self, parent, menu_display, editor_display, **kwargs):
-        super().__init__(parent, "select",
-            config_true={"relief": tk.SUNKEN, 
-                        "bg": "white smoke",
-                        "text":"edit"}, 
-            config_false={"relief": tk.SUNKEN,
-                        "bg": "white smoke",
-                        "text":"select"},
-            width=7, **kwargs)
+    def __init__(self, parent, initial, **kwargs):
+        super().__init__(parent,initial, 
+                font=("Courier", 12),
+                width=8,
+                bg="yellow")
+        self.data = [(txt, frame) for txt, frame in zip(kwargs.keys(), kwargs.values())]
+        self.command = self.switch
+        self.mode = 1
 
-        self.menu_display = menu_display
-        self.menu_editor = editor_display
+    def switch(self):
+        if self.mode == len(self.data):
+            self.mode = 0
+        
+        self["text"] = self.data[self.mode][0]
+        self.data[self.mode][1].instance.lift()
+        self.mode += 1
+        return self.data[self.mode - 1]
+    
+    def select(self, cls):
+        
+        for i, (txt, framecls) in enumerate(self.data):
+            if cls == framecls:
+                self["text"] = txt
+                framecls.instance.lift()
+                self.mode = i + 1
+                return
 
-    def _cmd(self):
-        if self.state:
-            self.state = False
-            self.menu_display.instance.lift()
-        else:
-            self.state = True
-            self.menu_editor.instance.lift()
 
 
 class ToggleFrame(tk.Frame, metaclass=lib.WidgetType, device="POS"):
     font = ("Courier", 12)
 
-    def __init__(self, parent, menudisplay, editordisplay, **kwargs):
-        super().__init__(parent, **kwargs)
+    def __init__(self, parent, initial, **kwargs):
+        super().__init__(parent)
         label = tk.Label(self, text="Menu Mode: ", font=self.font)
-        toggle = ToggleMenuMode(self, menudisplay, editordisplay, font=self.font)
         label.grid(row=0, column=0, sticky="nswe")
-        toggle.grid(row=0, column=1, sticky="nswe", ipadx=4)
+        self.switcher = FrameSwitch(self, initial, **kwargs)
+        self.switcher.grid(row=0, column=1, sticky="nswe", ipadx=4)
 
 
 class ControlPanel(tk.Frame):
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-    
-    def add_mode_toggle(self, menudisplay, editordisplay):
-        self.toggle = ToggleFrame(self, menudisplay, editordisplay)
+        self.select = None
+
+    def add_mode_toggle(self, initial, **frames):
+        self.toggle = ToggleFrame(self, initial, **frames)
         self.toggle.grid(row=0, column=0, sticky="nswe", pady=3)
-    
+        self.select = self.toggle.switcher.select
     def add_invoice_printer(self):
         command = functools.partial(lib.AsyncTk().forward, "print_invoice")
         label = tk.Label(self, text="Invoice Receipt", font=ToggleFrame.font)

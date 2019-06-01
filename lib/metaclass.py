@@ -368,7 +368,6 @@ class ReinstanceType(MenuWidget):
             return self.instance
         
         grid_info = self.instance.grid_info()
-        grid_info.pop("in")
         assert hasattr(self.instance, "children")
         if hasattr(self.instance, "dtor"):
             self.instance.dtor()
@@ -376,19 +375,23 @@ class ReinstanceType(MenuWidget):
             c.destroy()
         self.instance.__init__(*args, **kwargs)
         if hasattr(self.instance, "ctor"):
-            self.instance.ctor
-        self.instance.grid(**grid_info)
+            self.instance.ctor()
+
+        if "in" in grid_info:
+            grid_info.pop("in")    
+            self.instance.grid(**grid_info)
         return self.instance
     
     @classmethod
-    def reinstance(cls, target=None):    
+    def reinstance(cls, target=None):
         if target is None:
             for cls, args, kwargs in cls.objects:
-                return cls(*args, **kwargs)
+                cls(*args, **kwargs)
         else:
             for cls, args, kwargs in cls.objects:
                 if target == cls:
-                    return cls(*args, **kwargs)
+                    cls(*args, **kwargs)
+    
         
                 
 class SingletonType(type):
@@ -402,3 +405,9 @@ class SingletonType(type):
             self.instance = super().__call__(*args, **kwargs)
         return self.instance
 
+
+class SingletonMenu(MenuType, SingletonType):
+    ...
+
+class SingletonWidget(WidgetType, SingletonType):
+    ...

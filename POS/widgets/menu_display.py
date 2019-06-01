@@ -67,9 +67,6 @@ class OptionsEditor(tk.Toplevel, metaclass=lib.ToplevelType):
         self.destroy()
 
 
-class SingletonMenu(lib.SingletonType, lib.MenuType):
-    """resolve metaclass conflict"""
-
 # for higher throughput, items will be added to Order sequentially.
 # OrderNavigator() uses the first item to decide the next two tabs to lift
 # because want to cut down on the amount of taps it takes to complete a set
@@ -85,7 +82,7 @@ class SingletonMenu(lib.SingletonType, lib.MenuType):
 # So this should minimize error and the amount of screen taps needed to
 # add an order to the global Order() list
 
-class _OrderNagivator(tk.Frame, metaclass=SingletonMenu):
+class _OrderNagivator(tk.Frame, metaclass=lib.SingletonMenu):
     null = lib.MenuItem("", "", 0, {})
 
     def __init__(self, tabframe, **kwargs):

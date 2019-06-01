@@ -259,12 +259,61 @@ def labelentry(parent, text, variable, font=("Courier", 16), state=tk.DISABLED, 
     entry.grid(row=0, column=1, sticky="nsw")
     return frame
 
+class PaymentTypes(tk.Frame, metaclass=lib.ReinstanceType, device="POS"):
+    font=("Courier", 18)
+    button_args = ()
 
-class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.buttons = [
+                LabelButton(self, payment_type, font=self.font, width=15) 
+                for payment_type in type(self).payment_types] # pylint:disable=E1101
+        
+        self.cash_button = None
+        rowcount = 3
+        columncount = 0
+        for i, button in enumerate(self.buttons):
+            if i < 3:
+                button.grid(row=i, column=0, columnspan=2, sticky="nswe", padx=10, pady=2)        
+            else:
+                button.configure(font=(self.font[0], self.font[1] + 2))
+                if columncount == 2:
+                    columncount = 0
+                    rowcount += 1
+                button.grid(row=rowcount, column=columncount, sticky="nswe", padx=10, pady=2)
+                columncount += 1
+                        
+            if button["text"] == "Cash":
+                self.cash_button = button
+        assert self.cash_button is not None
+        self.ctor_args = None
+
+    def ctor(self):
+        self.set_button_command(*type(self).button_args)
+    
+    def dtor(self):
+        ...
+    
+    def set_button_command(self, cash, change, cash_given):
+        type(self).button_args = cash, change, cash_given
+        for button in self.buttons:
+            button.command = partial(ConfirmationWindow,
+                        self.master,
+                        button["text"],
+                        cash,
+                        change,
+                        cash_given)
+
+class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
     font=("Courier", 18)
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, widgettype=CheckoutTicketFrame)
+        self.interior.grid_columnconfigure(0, weight=1)
+        self.interior.grid_columnconfigure(1, weight=1)
+
         self.num_payment_types = len(CheckoutFrame.payment_types)
         self._ticket = tk.StringVar(self)
         self._ticket.set("000")
@@ -281,7 +330,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
                 self.interior,
                 bd=2,
                 relief=tk.RIDGE)
-
+        
         self.set_keypress_bind = self.calculator.set_keypress_bind
         
         self.calculator.grid(row=1, column=0,
@@ -290,40 +339,17 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
                 sticky="nswe",
                 pady=10,
                 padx=10)
-
         
-        self.calculator.update()
-
-        self.buttons = [
-                LabelButton(self.interior, payment_type, font=self.font) 
-                for payment_type in type(self).payment_types] # pylint:disable=E1101
-        
-        self.cash_button = None
-        rowcount = 3
-        columncount = 0
-        for i, button in enumerate(self.buttons):
-            if i < 3:
-                button.grid(row=i + 3, column=0, columnspan=2, sticky="nswe", padx=10, pady=2)        
-            else:
-                button.configure(font=(self.font[0], self.font[1] + 2))
-                if columncount == 2:
-                    columncount = 0
-                    rowcount += 1
-                button.grid(row=rowcount+3, column=columncount, sticky="nswe", padx=10, pady=2)
-                columncount += 1
-            
-            button.command = partial(ConfirmationWindow,
-                    self.interior,
-                    button["text"],
+        self.payment_frame = PaymentTypes(self.interior)
+        self.payment_frame.grid(row=3, column=0, columnspan=2, sticky="nswe")
+        self.payment_frame.set_button_command(
                     self.calculator.cash,
                     self.calculator.change,
                     self.calculator.cash_given)
-            
-            if button["text"] == "Cash":
-                self.cash_button = button
-        assert self.cash_button is not None
+        
         self.update_ticket_no()
-    
+        self.calculator.update()
+
     def on_enter(self):
         if self.calculator.change_due.get() != "- - -":
             ConfirmationWindow(
@@ -356,6 +382,7 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
         entry.grid(row=0, column=1, sticky="nswe")
         return frame
 
+    
 
     @update
     def update_ticket_no(self):
@@ -363,13 +390,11 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
 
     @update
     def update_order_list(self):
-        
-
         if not Order():
-            for button in self.buttons:
+            for button in self.payment_frame.buttons:
                 button.deactivate()
         else:
-            for button in self.buttons:
+            for button in self.payment_frame.buttons:
                 button.activate()
         
         grid_offset = self.num_payment_types
@@ -390,6 +415,6 @@ class CheckoutFrame(OrdersFrame, metaclass=MenuWidget, device="POS"):
             widget.grid_remove()
         
         if self.calculator.change_due.get() == "- - -":
-            self.cash_button.deactivate()
+            self.payment_frame.cash_button.deactivate()
         else:
-            self.cash_button.activate()
+            self.payment_frame.activate()

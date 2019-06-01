@@ -16,7 +16,7 @@ from .order import Order, NewOrder, receipt
 from .control_panel import *
 
 
-class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
+class OrderDisplay(TabbedFrame, metaclass=lib.SingletonWidget, device="POS"):
     tabfont = ("Courier", 16)
     
     def __init__(self, parent, **kwargs):
@@ -40,18 +40,9 @@ class OrderDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
                 condition=progress_frame.keybind_condition(self, "Processing"),
                 on_enter=progress_frame.on_enter)
 
-
-    def ctor(self):
-        self.update()
-    
-    def dtor(self):
-        for task in self.update_tasks:
-            lib.AsyncTk().remove(task)
-
-    def update(self):
-        self.update_tasks = (self["Orders"].update_order_list(),
+        self["Orders"].update_order_list(),
         self["Checkout"].update_order_list(),
-        self["Processing"].update_order_status())
+        self["Processing"].update_order_status()
 
 
 class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
@@ -106,13 +97,16 @@ class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
         stderr_scrollbar.grid(row=0, column=1, sticky="nse")
     
         controlpanel = ControlPanel(self["control panel"])
-        controlpanel.add_mode_toggle(MenuDisplay, MenuEditor)
+        controlpanel.add_mode_toggle("Menu", Menu=MenuDisplay, Edit=MenuEditor, Payment=PaymentOption)
         controlpanel.add_invoice_printer()
         controlpanel.daily_sales_printer()
         controlpanel.open_drawer()
         controlpanel.grid(sticky="nswe", pady=2, padx=2)
         type(self).instance = self
-
+        self.control_panel = controlpanel
+    
+    def set_frame_toggles(self, **frames):
+        self.control_panel.add_mode_toggle(**frames)
 
 class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
     font=("Courier", 14)
@@ -133,7 +127,6 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
         self.controls = ButtonFrame(self, font=self.font, bd=2, relief=tk.RIDGE)
         self.item_adder = ItemAdder(self, self.keyboard, font=self.font, bd=2, relief=tk.SUNKEN)
         self.item_adder.add_item.command = self.on_add_item
-
         self.category_editor.grid(row=0, column=0, rowspan=2, sticky="nswe")
         self.item_adder.grid(row=2, column=0, sticky="nswe")
         self.keyboard.grid(row=3, column=0, columnspan=2, sticky="nswe")
@@ -144,6 +137,10 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
         self.controls.save.command = self.on_save
         self.controls.apply.command = self.on_apply
         self.controls.reset.command = self.on_reset
+
+        self.payment_frame = PaymentOption(parent, self, self.keyboard)
+        self.payment_frame.grid(row=0, column=0, rowspan=3, sticky="nswe", in_=self)
+
 
     def ctor(self):
         self.update()
@@ -188,12 +185,11 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
         messages = "\n".join(message for message in messages if message).strip()
         if messages:
             logging.getLogger("main.POS.gui.stdout").info(messages)
-        
         EditorDelegate().apply()        
         # QoL: lift console stdout tab
         Console.instance.select("stdout")
         ReinstanceType.reinstance()
-        self.on_reset()
+        Console.instance.control_panel.select(MenuDisplay)
 
     def on_save(self, *args):
         messages = [config.apply().strip() for config in self.category_config.values()]
@@ -201,18 +197,19 @@ class MenuEditor(tk.Frame, metaclass=ReinstanceType, device="POS"):
         messages = "\n".join(message for message in messages if message).strip()
         if messages:
             logging.getLogger("main.POS.gui.stdout").info(messages)
+        
         AsyncTk().forward("edit_menu", EditorDelegate().apply())
         Console.instance.select("stdout")
         ReinstanceType.reinstance()
-        self.on_reset()
-        
+        Console.instance.control_panel.select(MenuDisplay)
+    
     def on_reset(self, *args):
         EditorDelegate().reset()
         ReinstanceType.reinstance(type(self))
-
-
-            
-
-
-
         
+
+    def lift(self):
+        super().lift()
+        self.category_editor.lift()
+        self.item_adder.lift()
+

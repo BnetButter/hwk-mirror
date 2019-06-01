@@ -11,12 +11,15 @@ import tkinter as tk
 import functools
 from copy import deepcopy
 
+const_payment_types = "Cash", "Check", "Invoice"
+
 class EditorDelegate(metaclass=lib.SingletonType):
 
     def __init__(self):
         self.menu = deepcopy(MenuType.menu_items)
         self.config = deepcopy(MenuType.menu_config)
-        
+        self.payment_options = self.config["Payment Types"]
+
     def remove_item(self, category, name):
         self.menu[category].pop(name)
         return f"Removed '{name}' from '{category}'"
@@ -100,6 +103,20 @@ class EditorDelegate(metaclass=lib.SingletonType):
     
     def reset(self):
         self.__init__()
+    
+    def add_payment_option(self, option:str):
+        print(option)
+        if option not in self.payment_options:
+            self.payment_options.append(option)
+        
+    def remove_payment_option(self, option:str):
+        assert (option in self.payment_options
+                and option not in const_payment_types) 
+        self.payment_options.remove(option)
+    
+    def payment_option_generator(self):
+        return (payment_option for payment_option in self.payment_options
+                if payment_option not in const_payment_types)
 
 class PriceEntry(tk.Frame):
     keyboard = None
@@ -248,7 +265,7 @@ class OptionEditorFrame(tk.Frame):
             for widget in self.widgets
                 if widget.item and not widget.removed
         }
-        
+
 
 class ItemEditor(tk.Frame):
 
@@ -399,8 +416,169 @@ class ButtonFrame(tk.Frame):
         self.save = lib.LabelButton(self, "Save", font=font, width=6)
         self.reset = lib.LabelButton(self, "Reset", font=font, width=6,
                 bg="yellow")
-    
         self.apply.grid(row=0, column=0, sticky="nswe", pady=2, padx=2)
         self.save.grid(row=1, column=0, sticky="nswe", pady=2, padx=2)
         self.reset.grid(row=2, column=0, sticky="nswe", pady=2, padx=2)
         self.grid_columnconfigure(0, weight=1)
+
+
+class PaymentOptionFrame(tk.Frame, metaclass=lib.WidgetType, device="POS"):
+    font = ("Courier", 14)
+    lst = None
+
+    def __init__(self, parent, payment_option, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._payment_type = tk.Label(self,
+                text=payment_option,
+                font=self.font,
+                width=15, 
+                relief=tk.SUNKEN,
+                bd=2)
+
+        self._remove_bt = lib.LabelButton(self, "remove",
+                command=self.remove,
+                font=self.font)
+        self._payment_type.grid(row=0, column=0, sticky="nswe",
+                 pady=2, padx=2, ipady=2, ipadx=2)
+        self._remove_bt.grid(row=0, column=1, sticky="nswe", 
+                pady=2, padx=2, ipadx=2, ipady=2)
+    
+    def remove(self):
+        type(self).lst.remove(self)
+        EditorDelegate().remove_payment_option(self.payment_type)
+        lib.AsyncTk().forward("stdout").info(f"Removed payment option '{self.payment_type}'")
+        self.destroy()
+        
+
+    @property
+    def payment_type(self):
+        return self._payment_type["text"]
+    
+    @payment_type.setter
+    def payment_type(self, value):
+        self._payment_type["text"] = value
+
+
+    def __call__(self):
+        EditorDelegate().add__payment_option(self.payment_type)
+
+class PaymentOptionAdder(tk.Frame, metaclass=lib.SingletonWidget, device="POS"):
+    font = ("Courier", 14)
+    widgets = None
+    instance = None
+
+    def __init__(self, parent, keyboard, font=None,**kwargs):
+        super().__init__(parent, **kwargs)
+        if font is None:
+            font = type(self).font
+        type(self).font = font
+
+        self.keyboard = keyboard
+        self.on_add = lib.LabelButton.null_cmd
+        self._payment_type = tk.StringVar(self)
+        self.entry = tk.Entry(self,
+                textvariable=self._payment_type,
+                font=self.font,
+                width=15)
+        self.add_button = lib.LabelButton(self,
+                text="Add",
+                command=self.on_add,
+                font=self.font)
+        self.entry.grid(row=0,
+                column=0,
+                sticky="nswe",
+                pady=4, padx=2,
+                ipady=2, ipadx=2)
+        self.add_button.grid(
+                row=0,
+                column=1,
+                pady=4, padx=2,
+                ipady=2, ipadx=2)
+
+        self.bind("<FocusIn>", self.on_focus_in)
+
+
+    def on_focus_in(self, *args):
+        self.keyboard.target = self.entry
+
+
+    @property
+    def payment_type(self):
+        return self._payment_type.get()
+    
+    @payment_type.setter
+    def payment_type(self, value):
+        self._payment_type.set(value)
+
+
+class PaymentOptionEditorFrame(lib.ScrollFrame, metaclass=lib.WidgetType, device="POS"):
+    font = ("Courier", 18)
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        tk.Label(self.interior,
+                text="Payment Options",
+                font=self.font,
+                bd=5
+                ).grid(row=0,
+                    column=0,
+                    sticky="nsw")
+
+        self.widgets = [
+            PaymentOptionFrame(self.interior, payment_option)
+            for payment_option in EditorDelegate().payment_option_generator()
+        ]
+
+        self.grid_widgets()
+    
+    def __iter__(self):
+        for widget in self.widgets:
+            yield widget.payment_type
+    
+    def grid_widgets(self):
+        for i, widget in enumerate(self.widgets):
+            widget.grid(row=i + 1, column=0, columnspan=2,
+                    sticky="nswe",
+                    pady=2,
+                    padx=2,
+                    ipadx=2,
+                    ipady=2)
+
+    def add_payment_option(self, option):
+        widget = PaymentOptionFrame(self.interior, option)
+        EditorDelegate().add_payment_option(widget.payment_type)
+        lib.AsyncTk().forward("stdout").info(f"Added Payment Option '{option}'")
+        self.widgets.append(widget)
+        self.grid_widgets()
+    
+
+class PaymentOption(tk.Frame, metaclass=lib.SingletonType):
+
+    def __init__(self, parent, _in, keyboard, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.payment_type_editor = PaymentOptionEditorFrame(self)
+        PaymentOptionFrame.lst = self.payment_type_editor.widgets
+        self.payment_adder = PaymentOptionAdder(self, keyboard, bd=2, relief=tk.SUNKEN)
+        self.payment_adder.add_button.command = self.on_add_payment
+        self.payment_type_editor.grid(row=0, column=0, rowspan=2, sticky="nswe")
+        self.payment_adder.grid(row=3, column=0, sticky="nswe")
+        self._in = _in
+    
+
+    def grid(self, **kwargs):
+        kwargs["in_"] = self._in
+        super().grid(**kwargs)
+
+    def lift(self):
+        self._in.lift()
+        super().lift()
+
+    def on_add_payment(self):
+        if self.payment_adder.payment_type == "":
+            return
+
+        self.payment_type_editor.add_payment_option(
+            self.payment_adder.payment_type)
+        self.payment_adder.payment_type = ""
