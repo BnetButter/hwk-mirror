@@ -417,4 +417,4 @@ class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
         if self.calculator.change_due.get() == "- - -":
             self.payment_frame.cash_button.deactivate()
         else:
-            self.payment_frame.activate()
+            self.payment_frame.cash_button.activate()

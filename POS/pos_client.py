@@ -85,21 +85,20 @@ class POSProtocol(POSInterface):
 
         fmter = "$ {:.2f}".format
         print_strs = [
-            "Payment Type: "  + payment_type,
-            "  Cash Given: " + fmter(cash_given / 100),
-            "  Change Due: " + fmter(change_due / 100),
             "Subtotal: "     + fmter(Order().subtotal / 100),
             "     Tax: "     + fmter(Order().tax / 100),
-            "   Total: "     + fmter(Order().total / 100)
+            "   Total: "     + fmter(Order().total / 100),
+            " ",
+            "Payment Type: "  + payment_type,
+            "  Cash Given: " + fmter(cash_given / 100),
+            "  Change Due: " + fmter(change_due / 100)
         ]
         
         price_style = Order().printer_style["total"]
         if payment_type == "Cash":
-            lines_conf.extend((line, price_style) for line in print_strs[:3])
+            lines_conf.extend((line, price_style) for line in print_strs)
         else:
-            lines_conf.append((print_strs[0], price_style))
-
-        lines_conf.extend((line, price_style) for line in print_strs[3:])
+            lines_conf.extend((line, price_style) for line in print_strs[:5])
         return lines_conf
 
     def _cancel_receipt_content(self, order, ticket_no):

@@ -150,6 +150,7 @@ class _OrderNagivator(tk.Frame, metaclass=lib.SingletonMenu):
     def reset(self):
         self.items = [type(self).null for i in range(3)]
         self.counter = 0
+        self.case = 0
         
     def create_ticket(self):
         OptionsEditor(self.parent)
