@@ -103,12 +103,12 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
         logging.getLogger(f"{logger.name}.stdout").info("System Initiated")
         self.loop.run_forever()
     
-    def destroy(self, *args):
+    def destroy(self, shutdown=True):
         self.running = False
         super().destroy()
-        if not DEBUG:
+        if not DEBUG and shutdown:
             os.system("sudo shutdown -H now")
-        
+
     def __call__(self):
         self.mainloop()
 

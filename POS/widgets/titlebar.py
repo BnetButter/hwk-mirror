@@ -55,7 +55,7 @@ def reboot():
             lib.stdout.write(f"{counter}s", replace=3)
             await asyncio.sleep(1)
             counter -= 1
-        lib.AsyncTk().destroy()
+        lib.AsyncTk().destroy(shutdown=False)
         await asyncio.sleep(1)
         main = sys.executable
         os.execl(main, main, *sys.argv)
@@ -64,7 +64,7 @@ def reboot():
 class ShutdownButton(lib.LabelButton, metaclass=lib.WidgetType, device="POS"):
     font = ("Courier", 10)
     
-    class shutdown_callback(tk.Toplevel, metaclass=lib.WidgetType, device="POS"):
+    class shutdown_callback(tk.Toplevel, metaclass=lib.ToplevelWidget, device="POS"):
         font=("Courier", 12)
 
         def __init__(self, parent, **kwargs):
