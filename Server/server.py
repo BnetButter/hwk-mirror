@@ -1,5 +1,6 @@
 from lib import ServerInterface
 from datetime import datetime
+import time
 import json
 import operator
 import lib
@@ -116,7 +117,7 @@ class Server(ServerInterface):
                 for item in valid_items)
 
     async def get_time(self, ws, data):
-        await ws.send(json.dumps({"result":(True, int(datetime.now()))}))
+        await ws.send(json.dumps({"result":int(time.time())}))
     
     async def global_shutdown(self, ws, data):
         self.shutdown_now = data
@@ -130,7 +131,6 @@ class Server(ServerInterface):
         return await ws.send(json.dumps({"result": (False, "Failed to write menu")}))
 
     async def get_menu(self, ws, data):
-
         with open(lib.MENUPATH, "r") as fp:
             await ws.send(json.dumps({"result": (True, json.load(fp))}))
         return await ws.send(json.dumps({"result": (False, f"Failed to read menu at {lib.MENUPATH}")}))

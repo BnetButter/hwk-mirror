@@ -96,8 +96,23 @@ class DisplayProtocol(lib.DisplayInterface):
         self.test_network_connection()
         self.connect()
         self.print_tickets()
+        self.get_time()
         self.show_num_tickets = NUM_TICKETS
 
+    def get_time(self):
+        if not lib.DEBUG:
+            async def get_time():
+                while True:
+                    if self.connected:
+                        break
+                    await asyncio.sleep(1/30)
+
+                async with websockets.connect(lib.address) as ws:
+                    await ws.send(json.dumps({"client_id":"Display", "request":"get_time", "data":None}))
+                    result = json.loads(await ws.recv())["result"]
+                    self.set_time(int(result))
+
+            return self.loop.create_task(get_time())
 
     def tickets(self):
         if self.order_queue is None:

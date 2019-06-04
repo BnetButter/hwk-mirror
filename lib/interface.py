@@ -19,6 +19,7 @@ from .data import APPDATA
 from .data import ASCIITIME, LEVEL_NAME, MESSAGE
 from .data import GUI_STDOUT, GUI_STDERR
 from .tkinterface import AsyncTk
+from datetime import datetime
 
 logger = logging.getLogger("websockets")
 logger.setLevel(logging.INFO)
@@ -71,6 +72,17 @@ class GlobalState:
     def client_message(message):
         message = json.loads(message)
         return message["client_id"], message["request"], message["data"]
+
+    def set_time(self, timestamp:int):
+        result = datetime.fromtimestamp(timestamp)
+        fmt_date = "sudo date +%Y%m%d -s \"{}{:02d}{:02d}\""
+        fmt_time = "sudo date +%T -s \"{:02d}:{:02d}:00\""
+        subprocess.call(
+                fmt_date.format(result.year, result.month, result.day),
+                    shell=True)
+        subprocess.call(
+                fmt_time.format(result.hour, result.minute),
+                    shell=True)
 
 
 class ServerInterface(GlobalState, metaclass=ABCMeta):
@@ -171,6 +183,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
             "set_order_status": self.set_order_status,
             "set_item_status": self.set_item_status,
             "set_ticket_printed": self.set_ticket_printed,
+            "get_time": self.get_time,
         }
 
         extern = {

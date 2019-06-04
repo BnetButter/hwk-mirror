@@ -1,3 +1,5 @@
+#! /home/pi/.local/bin/python3.7
+
 import POS
 import Server
 import functools

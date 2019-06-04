@@ -14,7 +14,10 @@ def main(delegate):
     logger.addHandler(handler)
 
     main = lib.AsyncTk(delegate())
-    main.geometry("1080x1920+1920+0")
+    geometry = "1080x1920"
+    if lib.DEBUG:
+        geometry = "1920x1080+1920+0"
+    main.geometry(geometry)
     main.resizable(False, False)
     main.attributes("-fullscreen", True)
 
