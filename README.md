@@ -23,6 +23,15 @@ Devices:
 
 6. Cash drawer (modified Epson RJ11 interface)
 
+
+Patch Notes 3.02.002
+    General:
+        - update readme patchnotes
+
+Patch Notes 3.0.2.001
+    Features:
+        - Added price screen which shows total, cash, change, ticket number to customer.
+        
 Patch Notes 3.01.004
     Bug Fix:
         - Fixed bug where Toplevel widgets did not appear at the center of the screen as intended.
