@@ -159,7 +159,7 @@ else:
                 await self.display(" Total: - - -", row=1)
                 await self.display("  Cash: - - -", row=2)
                 await self.display("Change: - - -", row=3)
-            
+            self.sem = asyncio.Semaphore()
             self.column = 8
             self.loop.run_until_complete(init())
 
@@ -210,13 +210,19 @@ else:
             return string
 
         async def set_total(self, value):
-            await self.display(self._getvalue(value), row=1, col=self.column)
+            value = self._getvalue(value)
+            async with self.sem:
+                await self.display(value, row=1, col=self.column)
         
         async def set_cash(self, value):
-            await self.display(self._getvalue(value), row=2, col=self.column)
+            value = self._getvalue(value)
+            async with self.sem:
+                await self.display(value, row=2, col=self.column)
         
         async def set_change(self, value):
-            await self.display(self._getvalue(value), row=3, col=self.column)
+            value = self._getvalue(value)
+            async with self.sem:
+                await self.display(value, row=3, col=self.column)
         
         async def set_ticket_no(self, value, postfix=""):
             if value is None:
@@ -226,6 +232,5 @@ else:
             # clear out rest of the columns
             value += (NCOL - 1 - (len(value) + (self.column - 1))) * " "
             assert self.column + len(value) == NCOL
-
-            await self.display(value, col=self.column)
-
+            async with self.sem:
+                await self.display(value, col=self.column)

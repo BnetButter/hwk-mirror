@@ -157,8 +157,6 @@ class POSProtocol(POSInterface):
         await asyncio.sleep(1/60)
 
     async def update_screen(self, cash, change, pause=False, ticket_no=None, postfix=""):
-        self.pause_screen_update = pause
-        await asyncio.sleep(0.2)
         await self.screen.set_cash(cash)
         await self.screen.set_change(change)
         if ticket_no is not None:
@@ -434,44 +432,29 @@ class POSProtocol(POSInterface):
     def update_total(self, tabbed_frame, modify_tab_name, editor):
         async def update():
             while True:
-                
-                while self.pause_screen_update:
-                    if tabbed_frame.current() != modify_tab_name:
-                        self.pause_screen_update = False
-                        break
-                    await asyncio.sleep(1/30)
-
-                await asyncio.sleep(0.2)
-                current = tabbed_frame.current()                           
-    
-                if current != self.last_tab:
-                    # tab changed so reset
-                    self.last_tab = current
-                    await self.screen.set_total(None)
-                    await self.screen.set_cash(None)
-                    await self.screen.set_change(None)
-                    continue
-            
-                # total value shown depends on active tab
-                if current == modify_tab_name:
-                        # show difference total
-                    if editor.ticket_no is not None:
-                        await self.screen.set_ticket_no(editor.ticket_no, "(edit)")
-                        await self.screen.set_total(editor.difference)
-                
+                await asyncio.sleep(1/60)
+                current_tab = tabbed_frame.current()
+                if current_tab == self.last_tab:
+                    if current_tab == "Orders" or current_tab == "Checkout":
+                        await self.screen.set_ticket_no(self.last_no)
+                        if not self.last_total:
+                            self.last_total = Order().total
+                            continue
+                        await self.screen.set_total(self.last_total)
+                     
+                    elif current_tab == "Processing":
+                        if editor.is_gridded:
+                            await self.screen.set_ticket_no(editor.ticket_no, "(edit)")
+                            await self.screen.set_total(editor.difference)
+                        else:
+                            await self.screen.set_total(None)
+                            continue
                 else:
-                    # show Order total
-                    await self.screen.set_ticket_no(self.last_no)
-                    await self.screen.set_total(self.last_total)
-
-                # set it to last total so it doesn't reset once order completes
-                if Order().total:
-                    # cache it for next loop
-                    self.last_total = Order().total
+                    self.last_tab = current_tab
                     self.last_no = self.ticket_no
-
-                # new order has started so reset cash given and change due
-                if Order():
-                    await self.screen.set_cash(None)
+                    self.last_total = None
+                    await self.screen.set_ticket_no(None)
+                    await self.screen.set_total(None)
                     await self.screen.set_change(None)
+                    await self.screen.set_cash(None)
         self.create_task(update())
