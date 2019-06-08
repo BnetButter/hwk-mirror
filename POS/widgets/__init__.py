@@ -44,6 +44,10 @@ class OrderDisplay(TabbedFrame, metaclass=lib.SingletonWidget, device="POS"):
         self["Checkout"].update_order_list(),
         self["Processing"].update_order_status()
 
+        lib.AsyncTk().forward("update_total", self,
+                "Processing",
+                self["Processing"].editor()
+            )
 
 class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
     tabfont = ("Courier", 18)

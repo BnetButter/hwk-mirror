@@ -566,6 +566,9 @@ class ProgressFrame(ScrollFrame):
         self.widget_cache = WidgetCache(OrderProgress, self.interior, initial_size=initial_size)
         self.show_completed_num = show_completed_num
         self.set_keypress_bind = OrderProgress.set_keypress_bind
+    
+    def editor(self):
+        return OrderProgress.editor
 
     def keybind_condition(self, notebook, tab):
         def func():

@@ -10,6 +10,7 @@ from lib import POSInterface
 from lib import TICKET_QUEUED, TICKET_COMPLETE, TICKET_WORKING
 from lib import OrderInterface
 from POS import Order, NewOrder
+from POS.lcd_display import LCDScreen
 import POS
 import collections
 import lib
@@ -25,8 +26,6 @@ import os
 import time
 
 
-
-
 class POSProtocol(POSInterface):
 
     def __init__(self):
@@ -35,10 +34,15 @@ class POSProtocol(POSInterface):
         self.connected = False
         self.test_network_connection()
         self.connect_task = self.connect()
-        self.receipt_printer = Printer("/dev/null")
+        self.receipt_printer = Printer()
         self.cash_drawer = Drawer()
+        self.screen = LCDScreen()
         self.stdout = logging.getLogger(f"main.{self.client_id}.gui.stdout")
         self.stderr = logging.getLogger(f"main.{self.client_id}.gui.stderr")
+        self.last_total = 0
+        self.last_no = 0
+        self.last_tab = ""
+        self.pause_screen_update = False
     
 
     def get_ticket_no(self, result):
@@ -75,6 +79,8 @@ class POSProtocol(POSInterface):
         return order_dct
 
     def _new_receipt_content(self, payment_type, cash_given, change_due):
+        if self.ticket_no is None:
+            self.ticket_no = 1
         lines_conf = [
                 ("{:03d}".format(self.ticket_no), Order().printer_style["ticket_no"]),
                 (time.strftime("%D %I:%M:%S %p", time.localtime()),
@@ -140,7 +146,7 @@ class POSProtocol(POSInterface):
         return lines_conf, item_difference_count
     
 
-    async def print_receipt(self, receipt):
+    async def print_receipt(self, receipt, *args):
         if lib.DEBUG:
             print("\n".join(line[0] for line in receipt))
         
@@ -150,19 +156,33 @@ class POSProtocol(POSInterface):
         self.receipt_printer.writeline("\n\n\n")
         await asyncio.sleep(1/60)
 
+    async def update_screen(self, cash, change, pause=False, ticket_no=None, postfix=""):
+        self.pause_screen_update = pause
+        await asyncio.sleep(0.2)
+        await self.screen.set_cash(cash)
+        await self.screen.set_change(change)
+        if ticket_no is not None:
+            await self.screen.set_ticket_no(ticket_no, postfix)
+
+
     def new_order(self, payment_type, cash_given, change_due):
         order_dct = self._new_order(
                 payment_type, cash_given, change_due)
-            
+
         if payment_type == "Cash":
             self.stdout.info("({})  Change Due: {:.2f}".format(self.ticket_no, change_due / 100))
             self.cash_drawer.open()
+            self.loop.create_task(self.update_screen(cash_given, change_due))
+        else:
+            self.loop.create_task(self.update_screen(None, None))
 
         receipt = self._new_receipt_content(payment_type, cash_given, change_due)
         # unblocks printer.writeline
         self.loop.create_task(self.print_receipt(receipt))
         task = self.loop.create_task(self.server_message("new_order", order_dct))
         NewOrder()
+        self.ticket_no += 1
+        
         def callback(task):
             ticket_no = task.result()
             ticket_no = "{:03d}".format(ticket_no)
@@ -181,7 +201,10 @@ class POSProtocol(POSInterface):
         
         if order["payment_type"] == "Cash":
             self.cash_drawer.open()
-            message = message.format(ticket_no, order["total"])
+            message = message.format(ticket_no, -1 * order["total"] / 100)
+       
+            self.loop.create_task(self.update_screen(None, -1 * int(order["total"]),
+                pause=True, ticket_no=ticket_no, postfix="(Cancel)"))
             if lib.DEBUG:
                 print("drawer open... ")
         else:
@@ -223,9 +246,9 @@ class POSProtocol(POSInterface):
                     cash_given,
                     change,
                     difference)
-     
+
         if not changes_made_cnt:            
-            return self.stdout.info("No changes made to ticket no. {:03d}".format(int(ticket_no)))
+            return self.stdout.info("No changes made to ticket no. {:03d}".format(int(ticket_no)))        
         
         total = 0
         for i, ticket in enumerate(modified):
@@ -251,13 +274,15 @@ class POSProtocol(POSInterface):
                         and difference != "0.00" \
                         and change:
             self.stdout.info("  Change Due: {:.2f}".format(change / 100))
-            self.cash_drawer.open()
+            self.loop.create_task(self.update_screen(cash_given, change))
             if lib.DEBUG:
                 print("drawer open...")
         
+    
+
         # create non-blocking print task
         self.loop.create_task(self.print_receipt(modify_receipt))
-        
+
         # send server request
         task = self.loop.create_task(self.server_message("modify_order", (ticket_no, modified_dct)))
     
@@ -402,6 +427,51 @@ class POSProtocol(POSInterface):
         if not lib.DEBUG:
             args.append("> /dev/serial0")
         return subprocess.call(" ".join(args), shell=True)
-
+    
     def open_drawer(self):
         self.cash_drawer.open()
+    
+    def update_total(self, tabbed_frame, modify_tab_name, editor):
+        async def update():
+            while True:
+                
+                while self.pause_screen_update:
+                    if tabbed_frame.current() != modify_tab_name:
+                        self.pause_screen_update = False
+                        break
+                    await asyncio.sleep(1/30)
+
+                await asyncio.sleep(0.2)
+                current = tabbed_frame.current()                           
+    
+                if current != self.last_tab:
+                    # tab changed so reset
+                    self.last_tab = current
+                    await self.screen.set_total(None)
+                    await self.screen.set_cash(None)
+                    await self.screen.set_change(None)
+                    continue
+            
+                # total value shown depends on active tab
+                if current == modify_tab_name:
+                        # show difference total
+                    if editor.ticket_no is not None:
+                        await self.screen.set_ticket_no(editor.ticket_no, "(edit)")
+                        await self.screen.set_total(editor.difference)
+                
+                else:
+                    # show Order total
+                    await self.screen.set_ticket_no(self.last_no)
+                    await self.screen.set_total(self.last_total)
+
+                # set it to last total so it doesn't reset once order completes
+                if Order().total:
+                    # cache it for next loop
+                    self.last_total = Order().total
+                    self.last_no = self.ticket_no
+
+                # new order has started so reset cash given and change due
+                if Order():
+                    await self.screen.set_cash(None)
+                    await self.screen.set_change(None)
+        self.create_task(update())
