@@ -135,7 +135,7 @@ class POSProtocol(POSInterface):
             item_difference_count += diff
             lines_conf.extend((l, Order().printer_style["item"]) for l in line)
         
-        
+
 
         price_style = Order().printer_style["total"]
         payment_type = original_order["payment_type"]
@@ -444,6 +444,8 @@ class POSProtocol(POSInterface):
                     if current_tab == "Orders":
                         await self.screen.set_ticket_no(self.ticket_no)
                         await self.screen.set_total(Order().total)
+                        self.last_total = Order().total
+                        self.last_no = self.ticket_no
                     
                     # use previous value because Order().total resets the moment checkout is complete
                     # we don't want the screen to update until we return back to Orders tab.
@@ -460,7 +462,8 @@ class POSProtocol(POSInterface):
                             await self.screen.set_total(editor.difference)
                         else:
                             await self.screen.set_total(None)
-                
+                            await self.screen.set_ticket_no(None)
+
                 # Orders -> Checkout tab switch. No need to clear out ticket_no, total
                 elif current_tab == "Checkout" and self.last_tab == "Orders":
                     self.last_tab = current_tab
@@ -470,7 +473,6 @@ class POSProtocol(POSInterface):
                 else:
                     self.last_tab = current_tab
                     self.last_no = self.ticket_no
-                    self.last_total = None
                     await self.screen.set_ticket_no(None)
                     await self.screen.set_total(None)
                     await self.screen.set_change(None)
