@@ -23,7 +23,10 @@ Devices:
 
 6. Cash drawer (modified Epson RJ11 interface)
 
-
+Patch Notes 3.02.003:
+    Bug Fix:
+        - Fixed a bug where changing item options without changing an item resulted in a no changes warning and preventing modify_order call to server.
+        - Fixed a bug involving LCD Price Screen
 
 Patch Notes 3.02.002
     General:
