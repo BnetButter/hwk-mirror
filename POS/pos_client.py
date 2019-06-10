@@ -429,26 +429,42 @@ class POSProtocol(POSInterface):
     def open_drawer(self):
         self.cash_drawer.open()
     
-    def update_total(self, tabbed_frame, modify_tab_name, editor):
+    # TODO delegate object knows a bit too much about the widget that's calling it
+    # perhaps extract to another class to be initiated in main
+    def update_total(self, tabbed_frame, editor):
         async def update():
             while True:
                 await asyncio.sleep(1/60)
                 current_tab = tabbed_frame.current()
                 if current_tab == self.last_tab:
-                    if current_tab == "Orders" or current_tab == "Checkout":
+
+                    # filling out order for customer
+                    if current_tab == "Orders":
+                        await self.screen.set_ticket_no(self.ticket_no)
+                        await self.screen.set_total(Order().total)
+                    
+                    # use previous value because Order().total resets the moment checkout is complete
+                    # we don't want the screen to update until we return back to Orders tab.
+                    elif current_tab == "Checkout":
                         await self.screen.set_ticket_no(self.last_no)
-                        if not self.last_total:
-                            self.last_total = Order().total
-                            continue
-                        await self.screen.set_total(self.last_total)
-                     
+                        await self.screen.set_total(self.last_total)                     
+                    
+                    # need to show editor information instead
+                    # this block also allows the cancel_order() and modify_order()
+                    # functions to set cash and change values.
                     elif current_tab == "Processing":
                         if editor.is_gridded:
                             await self.screen.set_ticket_no(editor.ticket_no, "(edit)")
                             await self.screen.set_total(editor.difference)
                         else:
                             await self.screen.set_total(None)
-                            continue
+                
+                # Orders -> Checkout tab switch. No need to clear out ticket_no, total
+                elif current_tab == "Checkout" and self.last_tab == "Orders":
+                    self.last_tab = current_tab
+                    continue
+
+                # switching tabs in any other sequence resets the lcd screen
                 else:
                     self.last_tab = current_tab
                     self.last_no = self.ticket_no
