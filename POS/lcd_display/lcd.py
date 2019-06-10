@@ -114,6 +114,11 @@ if lib.DEBUG:
             for entry in self._screen:
                 entry.set("")
 
+        async def set_null(self):
+            await self.display("        ***")
+            await self.display(" Total: - - -", row=1)
+            await self.display("  Cash: - - -", row=2)
+            await self.display("Change: - - -", row=3)
 
     class _Entry(tk.Entry):
 
@@ -155,10 +160,11 @@ else:
                 await self.write_cmd(LCD_CLEARDISPLAY)
                 await self.write_cmd(LCD_ENTRYMODESET | LCD_ENTRYLEFT)
                 await asyncio.sleep(0.2)
-
+                await self.display("***", row=0, col=8)
                 await self.display(" Total: - - -", row=1)
                 await self.display("  Cash: - - -", row=2)
                 await self.display("Change: - - -", row=3)
+
             self.sem = asyncio.Semaphore()
             self.column = 8
             self.loop.run_until_complete(init())
@@ -224,6 +230,14 @@ else:
             async with self.sem:
                 await self.display(value, row=3, col=self.column)
         
+        def _getticket(self, value, postfix=""):
+            if value is None:
+                value = "*** " + postfix
+            else:
+                value = "{:03d} ".format(value) + postfix
+            value += (NCOL - 1 - (len(value) + (self.column - 1))) * " "
+            return value
+
         async def set_ticket_no(self, value, postfix=""):
             if value is None:
                 value = "*** " + postfix
@@ -234,3 +248,11 @@ else:
             assert self.column + len(value) == NCOL
             async with self.sem:
                 await self.display(value, col=self.column)
+
+        async def set_null(self):
+            async with self.sem:
+                null_price = self._getvalue(None)
+                await self.display(self._getticket(None), col=self.column)
+                await self.display(null_price, row=1, col=self.column)
+                await self.display(null_price, row=2, col=self.column)
+                await self.display(null_price, row=3, col=self.column)
