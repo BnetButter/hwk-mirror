@@ -24,6 +24,7 @@ Devices:
 6. Cash drawer (modified Epson RJ11 interface)
 
 
+
 Patch Notes 3.02.002
     General:
         - update readme patchnotes
