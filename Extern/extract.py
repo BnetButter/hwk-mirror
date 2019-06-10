@@ -1,13 +1,13 @@
 import websockets
-import lib
 import json
 import asyncio
 import csv
 
 LOCAL_PATH = "./sales.csv"
+address = "192.168.1.100:8080"
 
 async def get_data():
-    async with websockets.connect(lib.address) as ws:
+    async with websockets.connect(address) as ws:
         await ws.send(json.dumps({"client_id": "Extern", "request": "extract", "data": None}))
         return json.loads(await ws.recv())["result"]
 
