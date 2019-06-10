@@ -473,6 +473,6 @@ class POSProtocol(POSInterface):
                 else:
                     self.last_tab = current_tab
                     self.last_no = self.ticket_no
-                    self.screen.set_null()
-                    
+                    await self.screen.set_null()
+
         self.create_task(update())
