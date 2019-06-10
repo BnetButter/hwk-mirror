@@ -164,6 +164,9 @@ class TicketType(MenuType):
         removed = "{} (removed)".format
         added = "{} (added)".format
 
+        add_option = "    + {} (added)".format
+        remove_option = "    + {} (removed)".format
+
         change_count = 0
         for i, (a, b) in enumerate(zip(a, b)):
             if a.name and not b.name:
@@ -189,11 +192,32 @@ class TicketType(MenuType):
                 change_count += 1
 
             elif (a.name and b.name) and a.name == b.name:
-                if i:
-                    differences.append("  " + no_changes(a.name))
+
+                if a.selected_options == b.selected_options:
+                    if i:
+                        differences.append("  " + no_changes(a.name))
+                    else:
+                        differences.append(no_changes(a.name))
                 else:
-                    differences.append(no_changes(a.name))
-        
+                    added_str = "\n".join(add_option(option) for option in b.selected_options
+                                if option not in a.selected_options)
+                    removed_str = "\n".join(remove_option(option) for option in a.selected_options
+                                if option not in b.selected_options)
+                    no_change_str = "\n".join("    + {}".format(option) for option in a.selected_options
+                            if option in b.selected_options)
+
+
+                    changes = "\n".join(string for string in (no_change_str, added_str, removed_str) if string)
+                    if changes:
+                        changes = "\n" + changes
+                
+                    if i:
+                        differences.append("  " + no_changes(a.name) + changes)
+                    else:
+                        differences.append(no_changes(a.name) + changes)
+
+                    change_count += 1
+
         for line in differences:
             if len(line) > 34:
                 line.replace("->", "\n    -> ")

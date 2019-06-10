@@ -134,7 +134,9 @@ class POSProtocol(POSInterface):
             line, diff = Order().compare(original, new)
             item_difference_count += diff
             lines_conf.extend((l, Order().printer_style["item"]) for l in line)
-    
+        
+        
+
         price_style = Order().printer_style["total"]
         payment_type = original_order["payment_type"]
         lines_conf.append(("Difference  : " + "{:.2f}".format(difference / 100), price_style))
@@ -142,7 +144,7 @@ class POSProtocol(POSInterface):
         if payment_type == "Cash":
             lines_conf.append(("  Cash Given: " + "{:.2f}".format(cash_given / 100), price_style))
             lines_conf.append(("  Change Due: " + "{:.2f}".format(difference / 100), price_style))
-        
+
         return lines_conf, item_difference_count
     
 
