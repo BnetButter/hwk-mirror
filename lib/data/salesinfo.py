@@ -1,4 +1,4 @@
-from datetime import datetime
+import time
 import csv
 
 
@@ -10,7 +10,7 @@ class SalesInfo:
         self.filename = filename
         
     def to_csv(self, data):
-        timestamp = int(datetime.timestamp(datetime.now()))
+        timestamp = int(time.time())
         total = data["total"]
         subtotal = data["subtotal"]
         tax = data["tax"]

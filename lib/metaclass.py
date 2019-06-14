@@ -14,6 +14,66 @@ import asyncio
 import websockets
 import logging
 
+class MenuItemType(ABCMeta):
+
+    __attributes = ("category", "name", "price", "options", "alias", "hidden")
+    def __new__(cls, name, bases, attr, **kwargs):
+        if "__str__" not in attr:
+            attr["__str__"] = cls.__str__
+        attr["__bases__"] = bases
+        return super().__new__(cls, name, bases, attr, **kwargs)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        getproperty = lambda index: property(self.getx(index), self.setx(index))
+        self.category = getproperty(0)
+        self.name = getproperty(1)
+        self.price = getproperty(2)
+        self.options = getproperty(3)
+        self.alias = getproperty(4)
+        self.hidden = getproperty(5)
+
+    @staticmethod
+    def __str__(self):
+
+        if tuple in type(self).__bases__:
+            cls = tuple
+        if list in type(self).__bases__ \
+                or UserList in type(self).__bases__:
+            cls = list
+
+
+        string = "{}={}".format
+        result = str(cls(
+            string(name, attr)
+            for name, attr in zip(type(self).__attributes, self)))
+        return "MenuItem" + result.replace("'", "")
+
+    @staticmethod
+    def dct_setx(index, key):
+        def _(self, value):
+            self[index][key] = value
+        return _
+    
+    @staticmethod
+    def dct_getx(index, key):
+        def _(self):
+            return self[index][key]
+        return _
+
+    @staticmethod
+    def setx(index):
+        def _(self, value):
+            self[index] = value
+        return _
+    
+    @staticmethod
+    def getx(index):
+        def _(self):
+            return self[index]
+        return _
+        
+
 class MenuItem(tuple):
     def __new__(cls, category, name, price, options):
         return super().__new__(cls, (category, name, price, options))
@@ -29,7 +89,6 @@ class MenuItem(tuple):
     name = property(itemgetter(1))
     price = property(itemgetter(2))
     options = property(itemgetter(3))
-
 
 
 class MenuType(ABCMeta):
@@ -138,7 +197,9 @@ class TicketType(MenuType):
         self.parameters = property(itemgetter(5), self.setter(5))
         self.addon1 = property(itemgetter(6), self.setter(6))
         self.addon2 = property(itemgetter(7), self.setter(7))
-    
+        self.alias = property(self.get_parameter("alias"), self.set_parameter("alias"))
+
+
     def convert_to(self, category, name, price, options, selected_options, parameters, addon1=None, addon2=None):
         if addon1 is not None and addon2 is not None:
             addon1 = tuple.__new__(self, addon1)
@@ -235,6 +296,30 @@ class TicketType(MenuType):
             self.selected_options.clear()
             self.selected_options.extend(iterable)
     
+    @staticmethod
+    def set_alias(index):
+        def _setx(self, value):
+            self[index]["alias"] = value
+        return _setx
+    
+    @staticmethod
+    def get_alias(index):
+        def getx(self):
+            return self[index]["alias"]
+        return getx
+    
+    @staticmethod
+    def get_parameter(string):
+        def getp(self):
+            return self[5][string]
+        return getp
+    
+    @staticmethod
+    def set_parameter(string):
+        def setp(self, value):
+            self[5][string] = value
+        return setp
+
 
 class Ticket(MenuItem, metaclass=TicketType):
 

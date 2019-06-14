@@ -4,7 +4,7 @@ import asyncio
 import csv
 
 LOCAL_PATH = "./sales.csv"
-address = "192.168.1.100:8080"
+address = "ws://192.168.1.100:8080"
 
 async def get_data():
     async with websockets.connect(address) as ws:
