@@ -24,8 +24,8 @@ except:
 
 DEBUG = CONFIGDATA["__debug"]
 
-router_ip = "192.168.0.1" if DEBUG else CONFIGDATA["router"]
-device_ip = "192.168.0.5" if DEBUG else CONFIGDATA["ip"]
+router_ip = CONFIGDATA["router"]
+device_ip = CONFIGDATA["ip"]
 port = CONFIGDATA["port"] # port of the primary server handler
 address = f"ws://{device_ip}:{port}"
 

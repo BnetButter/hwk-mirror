@@ -187,7 +187,8 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         }
 
         extern = {
-            "extract": self.extract
+            "extract": self.extract,
+            "ping": self.ping
         }
         
         switch = {
@@ -216,7 +217,9 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
 
         return task
     
-
+    @abstractmethod
+    async def ping(self):
+        ...
 
     @abstractmethod
     async def new_order(self):

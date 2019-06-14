@@ -19,6 +19,9 @@ class Server(ServerInterface):
         self.loop.create_task(self.remove_completed())
         self.loop.create_task(self.set_completed())
     
+    async def ping(self, ws, data):
+        await ws.send(json.dumps({"result":True}))
+
     async def new_order(self, ws, data):
         self.order_queue[self.ticket_no] = data
         await ws.send(json.dumps({"result":self.ticket_no}))
