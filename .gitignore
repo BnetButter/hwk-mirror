@@ -11,3 +11,5 @@ CashDrawer/module/build/temp.linux-x86_64-3.7/drawermodule.o
 *.o
 **/build
 GoogleDrive/GoogleDrive.code-workspace
+GoogleDrive/credentials.json
+GoogleDrive/token.pickle
