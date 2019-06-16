@@ -30,6 +30,12 @@ port = CONFIGDATA["port"] # port of the primary server handler
 address = f"ws://{device_ip}:{port}"
 
 
+
+SALESLOG_SPREADSHEET_ID = \
+    "1qvbFERuS--3eEvJItBqTekLqUifGFaMhKFjbsajVA4g" if DEBUG \
+        else CONFIGDATA["saleslog id"]
+
+
 class _TicketStatus(int):
     
     def __new__(cls, number):

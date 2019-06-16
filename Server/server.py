@@ -1,5 +1,7 @@
 from lib import ServerInterface
 from datetime import datetime
+from .loggers import SalesLogger
+from .loggers import EventLogger
 import time
 import json
 import operator
@@ -8,11 +10,12 @@ import asyncio
 import subprocess
 import collections
 
+
 class Server(ServerInterface):
         
     def __init__(self):
         super().__init__()
-        self.salesinfo = lib.SalesInfo(lib.SALESLOG)
+        self.saleslogger = SalesLogger()
         self.canceled_tickets = asyncio.Queue()
         self.completed_tickets = asyncio.Queue()
         self.loop.create_task(self.remove_cancelled())
@@ -53,7 +56,7 @@ class Server(ServerInterface):
             while self.order_queue[number]["print"]:
                 await asyncio.sleep(1/60)
             self.logger.info("completed ticket no. {:03d}".format(number))
-            self.salesinfo.write(self.order_queue.pop(number))
+            await self.saleslogger.write(self.order_queue.pop(number))
             self.completed_tickets.task_done()
 
     async def remove_cancelled(self):
@@ -147,4 +150,4 @@ class Server(ServerInterface):
                 break
     
     async def extract(self, ws, data):
-        await ws.send(json.dumps({"result": self.salesinfo.data()}))
+        await ws.send(json.dumps({"result": self.saleslogger.data()}))

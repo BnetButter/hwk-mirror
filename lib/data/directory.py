@@ -9,4 +9,7 @@ if not os.path.exists(APPDATA):
 MENUPATH = os.path.join(APPDATA, "menu_items.json")
 LOGPATH = os.path.join(APPDATA, "server.log")
 CONFIGPATH = os.path.join(APPDATA, "config.json")
-SALESLOG = os.path.join(APPDATA, "sales.csv")
+SALESLOG = os.path.join(APPDATA, "sales")
+CREDENTIALS = os.path.join(APPDATA, "credentials.json")
+TOKEN = os.path.join(APPDATA, "token.pickle")
+

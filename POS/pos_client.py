@@ -391,6 +391,7 @@ class POSProtocol(POSInterface):
         return order_dct
     
     def print_invoice(self):
+        self.stdout.info("--DEPRECATED--")
         month = 2592000
         current_time = int(time.time())
         start_time = current_time - month
@@ -413,6 +414,7 @@ class POSProtocol(POSInterface):
     # but no receipt printer at the moment for testing.
     # safer to just add another function and awk script.
     def print_daily_sales(self):
+        self.stdout.info("--DEPRECATED--")
         day = 86400
         current_time = int(time.time())
         start_time = current_time - day
@@ -423,7 +425,7 @@ class POSProtocol(POSInterface):
             "-f" + os.path.join(os.getcwd(), "hwk/POS/sales.awk "),
             lib.SALESLOG + " ",
         ]
-        
+
         if not lib.DEBUG:
             args.append("> /dev/serial0")
         return subprocess.call(" ".join(args), shell=True)
@@ -431,6 +433,7 @@ class POSProtocol(POSInterface):
     def open_drawer(self):
         self.cash_drawer.open()
     
+    # LCD PRICE SCREEN
     # TODO delegate object knows a bit too much about the widget that's calling it
     # perhaps extract to another class to be initiated in main
     def update_total(self, tabbed_frame, editor):

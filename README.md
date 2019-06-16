@@ -23,6 +23,17 @@ Devices:
 
 6. Cash drawer (modified Epson RJ11 interface)
 
+Patch Notes 3.03.002:
+    Features:
+        - Sales are now logged to google drive as well as locally.
+        - Deprecating invoice receipt printing and daily sales printing since sales data can be accessed non-locally.
+        - Deprecating Extern.extract server request.
+        - Added "saleslog id" to field to config.json (in local appdata folder)
+
+Patch Notes 3.03.001:
+    Features:
+        - client device should be able to connect to a server without the server device being reserved in a DHCP table.
+
 Patch Notes 3.02.003:
     Bug Fix:
         - Fixed a bug where changing item options without changing an item resulted in a no changes warning and preventing modify_order call to server.
