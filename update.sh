@@ -19,6 +19,11 @@ pwd
 echo "running setup for hwk/CashDrawer"
 $PYTHON setup.py install
 
+cd $HOME/hwk/GoogleDrive
+pwd
+echo "running setup for hwk/GoogleDrive"
+$PYTHON setup.py install
+
 if [ "$device" = "pos" ]
 then
     lx_script="@/home/pi/hwk/start_pos.py"
