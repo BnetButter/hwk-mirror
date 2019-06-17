@@ -34,12 +34,14 @@ class SalesLogger(lib.SalesInfo):
         asyncio.get_event_loop().run_until_complete(_api_call())
 
     async def write(self, data):
-        if self.test_connection():
+        try:
             content = list(self.to_csv(data))
             content[5] = str(content[5])
             content = [content]
             await self.api.append(lib.SALESLOG_SPREADSHEET_ID,
-                f"'{self.sheet_title}'!A1:F", content)
+                    f"'{self.sheet_title}'!A1:F", content)
+        except:
+           ... 
         super().write(data)
 
 
