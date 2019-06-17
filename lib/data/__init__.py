@@ -5,6 +5,7 @@ from json import dump
 from json import load
 from .logger import *
 from .salesinfo import *
+import socket
 
 try:
     with open(MENUPATH, "r") as fp:
@@ -35,6 +36,17 @@ SALESLOG_SPREADSHEET_ID = \
     "1qvbFERuS--3eEvJItBqTekLqUifGFaMhKFjbsajVA4g" if DEBUG \
         else CONFIGDATA["saleslog id"]
 
+MENU_SPREADSHEET_ID = \
+    "1MRrQhfoG_DODGQYruOYrUluqnBecAP2E-_AYVzZXdYI" if DEBUG \
+        else CONFIGDATA["menu id"]
+
+def test_connection():
+    try:
+        socket.setdefaulttimeout(1)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
+        return True
+    except:
+        return False
 
 class _TicketStatus(int):
     

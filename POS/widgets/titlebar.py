@@ -41,6 +41,7 @@ def shutdown():
         counter = 5
         lib.stdout.write(f"Global shutdown in {counter}s")
         lib.AsyncTk().forward("global_shutdown", counter)
+        lib.AsyncTk().forward("print_daily_sales")
         while counter > 0:
             lib.stdout.write(f"{counter}s", replace=3)
             await asyncio.sleep(1)

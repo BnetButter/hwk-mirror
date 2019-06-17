@@ -5,22 +5,23 @@ import Display
 import tkinter as tk
 import logging
 import sys
+import subprocess
 
 def main(delegate):
     logger = logging.getLogger("main")
-    logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler(stream=sys.stdout)
-    handler.setFormatter(logging.Formatter("%(name)s - %(message)s"))
-    logger.addHandler(handler)
-
     main = lib.AsyncTk(delegate())
-    geometry = "1080x1920"
     if lib.DEBUG:
         geometry = "1920x1080+1920+0"
+        fullscreen = False
+    else:
+        geometry = "1080x1920"
+        fullscreen = True
+        # set baudrate for receipt printer
+        subprocess.call("stty -F /dev/serial0 192000", shell=True)  
+    main.attributes("-fullscreen", fullscreen)
     main.geometry(geometry)
     main.resizable(False, False)
-    main.attributes("-fullscreen", True)
-
+    
     title_bar = Display.TitleBar(main)
     ticket_queue = Display.TicketQueue(main)
 

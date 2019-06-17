@@ -24,6 +24,9 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
         return super().__new__(cls, (*item, addon1, addon2, (ticket_no, nth_ticket)))
     
     def is_complete(self):
+        if not self.addon1.name and not self.addon2.name and self.parameters.get("status", lib.TICKET_COMPLETE):
+            return True
+        
         return all(value == lib.TICKET_COMPLETE for value in self.status)
     
     def is_working(self):
@@ -33,6 +36,9 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
         return all(value == lib.TICKET_QUEUED for value in self.status)
 
     def ticket_receipt(self, status, n_ticket):
+        if self.parameters.get("register", False):
+            return []
+        
         if status == lib.PRINT_NEW:
             status = "NEW TICKET", HEADER_OPT
         elif status == lib.PRINT_MOD:
@@ -40,9 +46,9 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
         elif status == lib.PRINT_NUL:
             status = "CANCELED TICKET", HEADER_OPT
         lines = list()      
-        header =  "{:03d} ({}/{})".format(
-                    self.ticket_no, self.index[1] + 1, n_ticket), HEADER_OPT
-
+        header =  "{:03d}".format(
+                    self.ticket_no), HEADER_OPT
+        
         if not self.parameters.get("register"): # pylint: disable=E1101
             lines.append((self.name, ITEM_OPT)) # pylint: disable=E1101
             lines.extend(("  + " + option, NULL_OPT) for option in self.selected_options) # pylint: disable=E1101
@@ -62,15 +68,15 @@ class OrderIndex(tuple, metaclass=lib.TicketType):
 
     @property
     def status(self):
-        return (self.parameters.get("status"),  # pylint: disable=E1101
-                self.addon1.parameters.get("status"),
-                self.addon2.parameters.get("status"))
+        return (self.parameters.get("status", lib.TICKET_COMPLETE),  # pylint: disable=E1101
+                self.addon1.parameters.get("status", lib.TICKET_COMPLETE),
+                self.addon2.parameters.get("status", lib.TICKET_COMPLETE))
     
     @status.setter
     def status(self, value):
-        self.parameters["status"] = lib.TICKET_WORKING # pylint: disable=E1101
-        self.addon1.parameters["status"] = lib.TICKET_WORKING
-        self.addon2.parameters["status"] = lib.TICKET_WORKING
+        self.parameters["status"] = value # pylint: disable=E1101
+        self.addon1.parameters["status"] = value
+        self.addon2.parameters["status"] = value
         
     @property
     def ticket_no(self):
@@ -89,14 +95,14 @@ class DisplayProtocol(lib.DisplayInterface):
     
     def __init__(self):
         super().__init__()
-        self.ticket_printer = Printer("/dev/null")
+        self.ticket_printer = Printer()
         self.ticket_generator = None
         self.network = False
         self.connected = False
         self.test_network_connection()
         self.connect()
         self.print_tickets()
-        self.get_time()
+        self.get_time() # deprecate
         self.show_num_tickets = NUM_TICKETS
 
     def get_time(self):
@@ -116,7 +122,7 @@ class DisplayProtocol(lib.DisplayInterface):
 
     def tickets(self):
         if self.order_queue is None:
-            return []        
+            return []
         return [ticket for ticket in self.order_queue if not ticket.is_complete()]
         
     def loads(self, string):
@@ -166,12 +172,13 @@ class DisplayProtocol(lib.DisplayInterface):
                         processed.add(ticket.ticket_no)
                 
                     line_opt = ticket.ticket_receipt(status, cnt)
-                    for line, opt in line_opt:
-                        self.ticket_printer.writeline(line, **opt)
-                    # make sure everything is above cutoff line
-                    self.ticket_printer.writeline("\n\n\n", **NULL_OPT)
-                    if lib.DEBUG:
-                        print("\n".join(line[0] for line in line_opt))
+                    if line_opt:
+                        for line, opt in line_opt:
+                            self.ticket_printer.writeline(line, **opt)
+                        # make sure everything is above cutoff line
+                        self.ticket_printer.writeline("\n\n\n", **NULL_OPT)
+                        if lib.DEBUG:
+                            print("\n".join(line[0] for line in line_opt))
                 await asyncio.sleep(1/30)
 
         def print_tickets(task):
