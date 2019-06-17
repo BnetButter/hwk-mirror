@@ -9,8 +9,7 @@ class SalesLogger(lib.SalesInfo):
 
     def __init__(self):
         date = time.strftime("%m-%d-%y", time.localtime())
-        localpath = os.path.join(lib.SALESLOG, date + ".sales.csv")
-        super().__init__(localpath)
+        super().__init__(lib.SALESLOG + ".csv")
         self.api = GoogleDrive.SheetsAPI(lib.TOKEN, lib.CREDENTIALS)
         self.sheet_title = date
         self.new_sales_sheet()
