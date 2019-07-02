@@ -17,7 +17,7 @@ def main(delegate):
         geometry = "1080x1920"
         fullscreen = True
         # set baudrate for receipt printer
-        subprocess.call("stty -F /dev/serial0 192000", shell=True)
+        subprocess.call("stty -F /dev/serial0 19200", shell=True)  
     main.attributes("-fullscreen", fullscreen)
     main.geometry(geometry)
     main.resizable(False, False)
