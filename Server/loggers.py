@@ -4,6 +4,8 @@ import socket
 import asyncio
 import GoogleDrive
 import os
+import json
+
 
 class SalesLogger(lib.SalesInfo):
 
@@ -13,6 +15,7 @@ class SalesLogger(lib.SalesInfo):
         self.api = GoogleDrive.SheetsAPI(lib.TOKEN, lib.CREDENTIALS)
         self.sheet_title = date
         self.new_sales_sheet()
+        self.queue = asyncio.Queue()
     
     def test_connection(self):
         try:
@@ -34,13 +37,25 @@ class SalesLogger(lib.SalesInfo):
         asyncio.get_event_loop().run_until_complete(_api_call())
 
     async def write(self, data):
-        if self.test_connection():
+        super().write(data)
+        await self.queue.put(data)
+
+    # unblock api.append
+    async def logger(self):
+        while True:
+            data = await self.queue.get()
             content = list(self.to_csv(data))
             content[5] = str(content[5])
             content = [content]
-            await self.api.append(lib.SALESLOG_SPREADSHEET_ID,
-                f"'{self.sheet_title}'!A1:F", content)
-        super().write(data)
+            try:
+                await self.api.append(lib.SALESLOG_SPREADSHEET_ID,
+                        f"'{self.sheet_title}'!A1:F", content)
+                self.queue.task_done()
+            except:
+                await asyncio.sleep(1/60)
+    
+    async def join(self):
+        await self.queue.join()
 
 
 class EventLogger:

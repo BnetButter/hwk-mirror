@@ -8,7 +8,6 @@ from lib import TicketType
 from lib import address, device_ip, router_ip
 from lib import POSInterface
 from lib import TICKET_QUEUED, TICKET_COMPLETE, TICKET_WORKING
-from lib import OrderInterface
 from POS import Order, NewOrder
 from POS.lcd_display import LCDScreen
 import POS
@@ -44,28 +43,40 @@ class POSProtocol(POSInterface):
         self.last_tab = ""
         self.pause_screen_update = False
     
-
+    def loads(self, string):
+        result = json.loads(string)
+        self.ticket_no = result["ticket_no"]
+        for ticket_no in result["order_queue"]:
+            dct = result["order_queue"][ticket_no]
+            dct["items"] = [lib.Ticket.convert_to(*item) for item in dct["items"]]
+        
+        self.order_queue = result["order_queue"]
+        self.requests = result["requests"]
+        self.connected_clients = result["connected_clients"]
+        self.shutdown_now = result["shutdown_now"]
+    
     def get_ticket_no(self, result):
         if self.ticket_no is not None:
             ticket_no = "{:03d}".format(self.ticket_no)
             result.set(ticket_no)
     
     @staticmethod
-    def _new_order(payment_type, cash_given, change_due):
-        order_dct = {"items":list(ticket for ticket in Order())}
+    def _new_order(payment_type, cash_given, change_due, name, deliver):
+        order_dct = {"items":list(Order())}
         order_dct["total"] = Order().total 
         order_dct["subtotal"] = Order().subtotal
         order_dct["tax"] = Order().tax
         order_dct["payment_type"] = payment_type
         order_dct["cash_given"] = cash_given
         order_dct["change_due"] = change_due
+        order_dct["name"] = name
+        order_dct["deliver"] = deliver
         
         # set print flag
-
         cnt_all = 0 # number of non-NULL items
         cnt_reg = 0 # number of items with register flag
         for ticket in Order():
-            items = filter(lambda item: item.name,(ticket, ticket[6], ticket[7]))
+            items = filter(lambda item: item.name, (ticket, ticket.addon1, ticket.addon2))
             for item in items:
                 cnt_all += 1
                 if item.parameters.get("register", False):
@@ -82,7 +93,7 @@ class POSProtocol(POSInterface):
         if self.ticket_no is None:
             self.ticket_no = 1
         lines_conf = [
-                ("{:03d}".format(self.ticket_no), Order().printer_style["ticket_no"]),
+                ("{:03d}".format(self.ticket_no), Order.printer_style["ticket_no"]),
                 (time.strftime("%D %I:%M:%S %p", time.localtime()),
                         {"justify":bytes('C', "utf-8")})]
         
@@ -100,7 +111,7 @@ class POSProtocol(POSInterface):
             "  Change Due: " + fmter(change_due / 100)
         ]
         
-        price_style = Order().printer_style["total"]
+        price_style = Order.printer_style["total"]
         if payment_type == "Cash":
             lines_conf.extend((line, price_style) for line in print_strs)
         else:
@@ -109,11 +120,11 @@ class POSProtocol(POSInterface):
 
     def _cancel_receipt_content(self, order, ticket_no):
         lines_conf = [
-                ("CANCEL " + "{:03d}".format(int(ticket_no)), Order().printer_style["ticket_no"]),
+                ("CANCEL " + "{:03d}".format(int(ticket_no)), Order.printer_style["ticket_no"]),
                 (time.strftime("%D %I:%M:%S %p", time.localtime()),
                         {"justify":bytes('C', "utf-8"), "size":bytes('S', "utf-8")})]
         
-        price_style = Order().printer_style["total"]
+        price_style = Order.printer_style["total"]
         lines_conf.append(("Payment Type: "  + order["payment_type"], price_style))
         lines_conf.append(("  Change Due: " + "{:.2f}".format(order["total"] / 100), price_style))
         return lines_conf
@@ -127,17 +138,15 @@ class POSProtocol(POSInterface):
                         {"justify":bytes('C', "utf-8"), "size":bytes('S', "utf-8")},
                 ("[original]", {})),
         ]
-
         item_difference_count = 0
         for original, new in zip(original_order["items"], new_order):
-            original = Order().convert_to(*original)
-            line, diff = Order().compare(original, new)
+            original = lib.Ticket.convert_to(*original)
+            line, diff = lib.Ticket.compare(original, new)
             item_difference_count += diff
-            lines_conf.extend((l, Order().printer_style["item"]) for l in line)
-        
+            lines_conf.extend((l, Order.printer_style["item"]) for l in line)
 
 
-        price_style = Order().printer_style["total"]
+        price_style = Order.printer_style["total"]
         payment_type = original_order["payment_type"]
         lines_conf.append(("Difference  : " + "{:.2f}".format(difference / 100), price_style))
         lines_conf.append(("Payment Type: "  + payment_type, price_style))
@@ -165,9 +174,12 @@ class POSProtocol(POSInterface):
             await self.screen.set_ticket_no(ticket_no, postfix)
 
 
-    def new_order(self, payment_type, cash_given, change_due):
+    def new_order(self, payment_type, cash_given, change_due, name, deliver):
+        if deliver and not name:
+            return self.stdout.info("Error: No name for delivery")
+
         order_dct = self._new_order(
-                payment_type, cash_given, change_due)
+                payment_type, cash_given, change_due, name, deliver)
 
         if payment_type == "Cash":
             self.stdout.info("({})  Change Due: {:.2f}".format(self.ticket_no, change_due / 100))
@@ -175,7 +187,7 @@ class POSProtocol(POSInterface):
             self.loop.create_task(self.update_screen(cash_given, change_due))
         else:
             self.loop.create_task(self.update_screen(None, None))
-
+        
         receipt = self._new_receipt_content(payment_type, cash_given, change_due)
         # unblocks printer.writeline
         self.loop.create_task(self.print_receipt(receipt))
@@ -224,7 +236,7 @@ class POSProtocol(POSInterface):
         task.add_done_callback(callback)
 
     def modify_order(self, ticket_no, modified, cash_given, change, difference):
-        original_dct = self.order_queue[str(ticket_no)]
+        original_dct = self.order_queue[str(ticket_no)]       
         # check cash given is greater than difference only 
         # if original payment type is cash.
         if change == "- - -" \
@@ -252,12 +264,9 @@ class POSProtocol(POSInterface):
         
         total = 0
         for i, ticket in enumerate(modified):
-            total += self.get_total(ticket, ticket[6], ticket[7])
-            # MutableTicket object is not json serializable
-            # and im too lazy to add decoder/encoder function
-            modified[i] = list(ticket)
-            modified[i][6] = list(ticket[6])
-            modified[i][7] = list(ticket[7])
+            total += self.get_total(ticket, ticket.addon1, ticket.addon2)
+            modified[i] = lib.Ticket.to_list(modified[i])
+        
 
         modified_dct = self.create_order(modified,
                 total,
@@ -277,8 +286,6 @@ class POSProtocol(POSInterface):
             self.loop.create_task(self.update_screen(cash_given, change))
             if lib.DEBUG:
                 print("drawer open...")
-        
-    
 
         # create non-blocking print task
         self.loop.create_task(self.print_receipt(modify_receipt))
@@ -320,11 +327,11 @@ class POSProtocol(POSInterface):
         num_items = 0
         num_completed = 0
         for ticket in tickets:
-            ticket = ticket[:6], ticket[6], ticket[7]
+            ticket = ticket, ticket.addon1, ticket.addon2
             for item in ticket:
-                if item[1]:
+                if item.name:
                     num_items += 1
-                if item[1] and item[5].get("status") == TICKET_COMPLETE:
+                if item.name and item.parameters.get("status") == TICKET_COMPLETE:
                     num_completed += 1
         return int((num_completed/num_items) * 100)
 
@@ -349,16 +356,16 @@ class POSProtocol(POSInterface):
     def get_total(self, item, addon1, addon2):
         assert all(isinstance(type(_item), lib.TicketType) for _item in (item, addon1, addon2))
         total = self._item_total(item)
-        if item.category in Order().two_sides \
-                or item.category in Order().no_addons:
+        if item.category in Order.two_sides \
+                or item.category in Order.no_addons:
             return total
-        
-        if item.category not in Order().include_drinks:
+         
+        if item.category not in Order.include_drinks:
             for addon in (addon1, addon2):
                 if addon.category == "Drinks":
                     total += self._item_total(addon)
 
-        if item.category not in Order().include_sides:
+        if item.category not in Order.include_sides:
             for addon in (addon1, addon2):
                 if addon.category == "Sides":
                     total += self._item_total(addon)
@@ -379,7 +386,7 @@ class POSProtocol(POSInterface):
             "payment_type":payment_type,
             "total": total}
         
-        tax_scale = int((Order().taxrate * 100) + 10000)
+        tax_scale = int((Order.taxrate * 100) + 10000)
         subtotal = int(decimal.Decimal((total * 100) 
                 / tax_scale).quantize(
                 decimal.Decimal('0.01'),
@@ -395,7 +402,7 @@ class POSProtocol(POSInterface):
         month = 2592000
         current_time = int(time.time())
         start_time = current_time - month
-        for payment_type in (p for p in Order().payment_types if p != "Cash" and p != "Check"):
+        for payment_type in (p for p in Order.payment_types if p != "Cash" and p != "Check"):
             args = [
                     "awk "
                     f"-vstart={start_time}",

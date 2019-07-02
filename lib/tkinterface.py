@@ -60,7 +60,8 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
         if refreshrate is None:
             refreshrate = 60
         self.interval = 1 / refreshrate
-        self.bind("<Escape>", self.destroy)
+        if DEBUG:
+            self.bind("<Escape>", self.destroy)
         self.running = False
     
     def update(self):

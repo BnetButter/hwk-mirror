@@ -12,7 +12,7 @@ from .checkout_display import *
 from .network_status import NetworkStatus
 from .titlebar import *
 from .progress_tab import *
-from .order import Order, NewOrder, receipt
+from .order import Order, NewOrder
 from .control_panel import *
 
 
@@ -46,6 +46,7 @@ class OrderDisplay(TabbedFrame, metaclass=lib.SingletonWidget, device="POS"):
         
         lib.AsyncTk().forward("update_total", self, self["Processing"].editor())
 
+
 class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
     tabfont = ("Courier", 18)
     def __init__(self, parent, **kwargs):
@@ -68,6 +69,7 @@ class MenuDisplay(TabbedFrame, metaclass=ReinstanceType, device="POS"):
     def dtor(self):
         lib.AsyncTk().remove(self.nav_update_func)
       
+
 class Console(TabbedFrame, metaclass=WidgetType, device="POS"):
     tabfont = ("Courier", 10)
     instance = None

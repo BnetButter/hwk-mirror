@@ -11,13 +11,13 @@ def main(delegate):
     logger = logging.getLogger("main")
     main = lib.AsyncTk(delegate())
     if lib.DEBUG:
-        geometry = "1920x1080+1920+0"
+        geometry = "1080x1080"
         fullscreen = False
     else:
         geometry = "1080x1920"
         fullscreen = True
         # set baudrate for receipt printer
-        subprocess.call("stty -F /dev/serial0 192000", shell=True)  
+        subprocess.call("stty -F /dev/serial0 192000", shell=True)
     main.attributes("-fullscreen", fullscreen)
     main.geometry(geometry)
     main.resizable(False, False)

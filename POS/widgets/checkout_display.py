@@ -10,7 +10,8 @@ from lib import LabelButton
 from lib import ToplevelWidget
 from lib import NumpadKeyboard
 from lib import AsyncTk, update
-from .order import Ticket, Order
+from lib import Ticket
+from .order import Order
 from .order_display import ItemLabel
 from .order_display import TicketFrame
 from .order_display import OrdersFrame
@@ -29,10 +30,15 @@ class RegisterButton(ToggleSwitch, metaclass=WidgetType, device="POS"):
 
     font=("Courier", 12)
 
+    def __init__(self, master, text, **kwargs):
+        super().__init__(master,
+                text,
+                font=self.font,
+                **kwargs)
 
     def _update(self, ticket):
         # during initiation, ticket.parameters is given a boolean type.
-        register = ticket.parameters["register"]
+        register = ticket.parameters.get("register", False)
         
         # we want to be able to set the state to the default value
         # while also being able to change the state's value.
@@ -44,11 +50,12 @@ class RegisterButton(ToggleSwitch, metaclass=WidgetType, device="POS"):
             # now the "register" value is slaved to self.state.
             ticket.parameters["register"] = self.state
 
+
 class CheckoutLabel(tk.Frame, metaclass=MenuWidget, device="POS"):
     font = ("Courier", 14)
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.checkbutton = RegisterButton(self, "register")
+        self.checkbutton = RegisterButton(self, "register", width=9)
         self.label = tk.Label(self, font=self.font, width=CheckoutLabel.longest_item, anchor="w")
         self.checkbutton.grid(row=0, column=0, padx=5, pady=2)
         self.label.grid(row=0, column=1, pady=2)
@@ -71,7 +78,6 @@ class CheckoutLabel(tk.Frame, metaclass=MenuWidget, device="POS"):
             self.label["text"] = ticket.name
 
 class CheckoutTicketFrame(tk.Frame):
-    null_ticket = Ticket(("", "", 0, {}))
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
@@ -100,25 +106,8 @@ class CheckoutTicketFrame(tk.Frame):
 
     def reset(self):
         for widget in self.widgets:
-            widget._update(self.null_ticket)
+            widget._update(lib.NULL_TICKET_ITEM)
 
-
-class Numpad(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
-    font=("Courier", 30)
-    
-    def __init__(self, parent, target, *args, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.title(string="Num Pad")
-        self.numpad = NumpadKeyboard(self, font=self.font, bd=5, relief=tk.RAISED)
-        self.numpad.pack(fill=tk.BOTH)
-        self.numpad.target = target
-        self.parent = parent
-
-        self.bind("<FocusOut>", self.destroy)
-      
-    def destroy(self, *args):
-        self.parent.focus_set()
-        super().destroy()
 
 class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
     font = ("Courier", 16)
@@ -133,9 +122,6 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
         self.price_input = lib.PriceInput(self, textvariable=self.cash_given, font=self.font, width=10)
         label.grid(row=0, column=0, sticky="nswe")
         self.price_input.grid(row=0, column=1, sticky="nswe")
-        
-
-
         change_due_frame = self.labeled_entry("Change Due ", self.change_due)
         cash_given_frame.grid(row=0, column=0, columnspan=2, sticky="nswe")
         change_due_frame.grid(row=1, column=0, columnspan=2, sticky="nswe")
@@ -188,53 +174,111 @@ class ChangeCalculator(tk.Frame, metaclass=WidgetType, device="POS"):
             self.change_due.set("- - -")
         else:
             self.change_due.set("{:.2f}".format(change / 100))
-       
+
 
 class ConfirmationWindow(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
     font=("Courier", 12)
 
-    __slots__ = ["payment_type", "textbox"]
     instance = None
 
     def __init__(self, parent, payment_type, cash, change, var, **kwargs):
         super().__init__(parent, **kwargs)
-        self.title("Confirm Ticket")
+        self.title("Confirm Order")
+        self.grid_columnconfigure(0, weight=1)
+        self.cash = cash
+        self.var = var
+        self.change = change
         self.payment_type = payment_type
         self.textbox = tk.Text(self, font=self.font, 
-                width=40,
+                width=32,
                 height=10,
-                state=tk.DISABLED,
                 bg="grey26",
                 fg="white")
+        self.textbox.insert('0.0',str(Order()))
+        self.textbox.configure(
+                state=tk.DISABLED)
+        self.name = lib.LabeledEntry(self,
+                text="Name:",
+                font=("Courier", 14))
+        self.name.configure_entry(
+                width=25)
+        if self.payment_type not in lib.CONST_PAYMENT_TYPES:
+            self.name.set(self.payment_type)
 
-        def on_confirm(*args):
-            AsyncTk().forward("new_order", self.payment_type, cash, change)
-            var.set("0.00")
-            self.destroy()
-
-        frame = tk.Frame(self, relief=tk.RIDGE, bd=2)
-        close = tk.Button(frame, text="Close", bg="red", command=self.destroy)
-        confirm = tk.Button(frame, text="Confirm", bg="green", command=on_confirm)
-        label = tk.Label(self, text=payment_type, font=self.font)
-        label.grid(row=0, column=0, sticky="nswe")
-        scrollbar = tk.Scrollbar(self, command=self.textbox.yview)
-        self.textbox["yscrollcommand"] = scrollbar.set
-        scrollbar.configure(command=self.textbox.yview)
-
-        self.textbox.grid(row=1, column=0, sticky="we")
-        scrollbar.grid(row=1, column=1, sticky="nswe")
-        close.grid(row=0, column=0, sticky="nse", padx=5, pady=5)
-        confirm.grid(row=0, column=1, sticky="nsw", padx=5, pady=5)
-        frame.grid(row=2, column=0, sticky="nswe", columnspan=2)
-        self.write(str(Order()))
-        self.bind("<KP_Enter>", on_confirm)
-
-
-    def write(self, value):
-        self.textbox["state"] = tk.NORMAL
-        self.textbox.insert(tk.END, value)
-        self.textbox["state"] = tk.DISABLED
+        frame = tk.Frame(self,
+                relief=tk.RIDGE,
+                bd=2)
+        self.deliver = lib.ToggleSwitch(frame, "Deliver",
+                width=8,
+                font=("Courier", 12, "bold"))
+        close = tk.Button(frame,
+                text="Close",
+                bg="red",
+                width=8,
+                command=self.destroy,
+                font=("Courier", 12, "bold"))
+        confirm = tk.Button(frame,
+                text="Confirm",
+                bg="green",
+                width=8,
+                command=self.on_confirm,
+                font=("Courier", 12, "bold"))
+        label = tk.Label(self,
+                text=payment_type,
+                font=self.font)
+        label.grid(row=0,
+                column=0,
+                sticky="nswe")
+        self.name.grid(
+                row=1,
+                column=0,
+                sticky="nswe",
+                padx=2)
+        scrollbar = tk.Scrollbar(self,
+                command=self.textbox.yview)
     
+        self.textbox["yscrollcommand"] = scrollbar.set
+        scrollbar.configure(
+                command=self.textbox.yview)
+        self.textbox.grid(
+                row=2,
+                column=0,
+                sticky="nswe")
+        scrollbar.grid(
+                row=2,
+                column=1,
+                sticky="nswe")
+        self.deliver.pack(
+                side=tk.LEFT,
+                ipady=8,
+                padx=2,
+                pady=2)
+        confirm.pack(
+                side=tk.RIGHT,
+                ipady=4,
+                padx=2,
+                pady=2)
+        close.pack(
+                side=tk.RIGHT,
+                ipady=4,
+                padx=2,
+                pady=2)
+        frame.grid(
+                row=3,
+                column=0,
+                sticky="nwse",
+                columnspan=2)
+        self.bind("<KP_Enter>", self.on_confirm)
+        self.name.entry.focus_set()
+    
+    def on_confirm(self, *args):
+            AsyncTk().forward("new_order", self.payment_type,
+                    self.cash, self.change,
+                    self.name.get(), self.deliver.state)
+            self.var.set("0.00") # pointless since calculator self updates. remove later
+            self.destroy()
+        
+    # i don't think anything calls this method
     @classmethod
     def confirmation(cls, parent, payment_method, cash, change, **kwargs):
         if cls.instance is None:
@@ -243,21 +287,6 @@ class ConfirmationWindow(tk.Toplevel, metaclass=ToplevelWidget, device="POS"):
         cls.__init__(cls.instance, parent, payment_method, cash, change, **kwargs)
         return cls.instance
 
-
-def labelentry(parent, text, variable, font=("Courier", 16), state=tk.DISABLED, **kwargs):
-    frame = tk.Frame(parent, **kwargs)
-    label = tk.Label(frame, font=font, text=text)
-    entry = tk.Entry(frame, 
-                font=font,
-                textvariable=variable,
-                state=state,
-                width=10,
-                disabledbackground="white",
-                disabledforeground="black")
-
-    label.grid(row=0, column=0, sticky="nse")
-    entry.grid(row=0, column=1, sticky="nsw")
-    return frame
 
 class PaymentTypes(tk.Frame, metaclass=lib.ReinstanceType, device="POS"):
     font=("Courier", 18)
@@ -306,8 +335,9 @@ class PaymentTypes(tk.Frame, metaclass=lib.ReinstanceType, device="POS"):
                         change,
                         cash_given)
 
+
 class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
-    font=("Courier", 18)
+    font=("Courier", 16)
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, widgettype=CheckoutTicketFrame)
@@ -316,16 +346,26 @@ class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
 
         self.num_payment_types = len(CheckoutFrame.payment_types)
         self._ticket = tk.StringVar(self)
-        self._ticket.set("000")
-        labelentry(self.interior, "Ticket     ", self._ticket, 
-                relief=tk.RIDGE, bd=2).grid(
-                        row=0,
-                        column=0,
-                        padx=10,
-                        pady=10,
-                        columnspan=2,
-                        sticky="nswe")
-
+        self._ticket.set("000")       
+       
+        self.ticket_no = lib.LabeledEntry(self.interior,
+                text="Ticket     ", 
+                textvariable=self._ticket,
+                font=self.font,
+                bd=2,
+                relief=tk.RIDGE)
+        self.ticket_no.configure_entry(
+                width=10,
+                state=tk.DISABLED,
+                disabledbackground="white",
+                disabledforeground="black")
+        self.ticket_no.grid(
+                row=0,
+                column=0,
+                sticky="nswe",
+                columnspan=2,
+                pady=2,
+                padx=10)
         self.calculator = ChangeCalculator(
                 self.interior,
                 bd=2,
@@ -333,7 +373,7 @@ class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
         
         self.set_keypress_bind = self.calculator.set_keypress_bind
         
-        self.calculator.grid(row=1, column=0,
+        self.calculator.grid(row=2, column=0,
                 rowspan=2,
                 columnspan=2,
                 sticky="nswe",
@@ -341,7 +381,7 @@ class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
                 padx=10)
         
         self.payment_frame = PaymentTypes(self.interior)
-        self.payment_frame.grid(row=3, column=0, columnspan=2, sticky="nswe")
+        self.payment_frame.grid(row=4, column=0, columnspan=2, sticky="nswe")
         self.payment_frame.set_button_command(
                     self.calculator.cash,
                     self.calculator.change,
@@ -381,8 +421,6 @@ class CheckoutFrame(OrdersFrame, metaclass=lib.MenuWidget, device="POS"):
         label.grid(row=0, column=0, sticky="nswe")
         entry.grid(row=0, column=1, sticky="nswe")
         return frame
-
-    
 
     @update
     def update_ticket_no(self):

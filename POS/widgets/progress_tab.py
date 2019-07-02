@@ -32,8 +32,7 @@ def alert(message):
 class MutableTicket(UserList, metaclass=TicketType):
     
     def __init__(self, ticket=None):
-        
-        self.data = list(ticket[:6])
+        super().__init__(ticket[:8])        
 
     @property
     def total(self):
@@ -52,7 +51,7 @@ class MutableTicket(UserList, metaclass=TicketType):
 
 class ItemEditorType(MenuWidget):
 
-    null_item = MutableTicket(("", "", 0, {}, [], {}))
+    null_item = MutableTicket(("", "", 0, {}, "", 0, [], {}))
 
     def item_names(self, category):
         try:
@@ -299,8 +298,8 @@ class TicketEditorFrame(tk.Frame):
 
         for i, ticket in enumerate(order_list):
             item, addon1, addon2 = (MutableTicket(ticket),
-                    MutableTicket(ticket[6]),
-                    MutableTicket(ticket[7]))
+                    MutableTicket(ticket.addon1),
+                    MutableTicket(ticket.addon2))
     
             # combobox needs to know what items to show by looking up
             # the item's category
@@ -478,9 +477,9 @@ class OrderProgress(tk.Frame, metaclass=MenuWidget, device="POS"):
         items, = AsyncTk().forward("get_order_info", int(self.ticket_no["text"]), "items")
         names = []
         for ticket in items:
-            for item in (ticket[:6], ticket[6], ticket[7]):
-                if item[5].get("register", False):
-                    names.append(f"'{item[1]}'")
+            for item in (ticket, ticket.addon1, ticket.addon2):
+                if item.parameters.get("register", False):
+                    names.append(f"'{item.name}'")
         alert(f"{', '.join(names)} may have been completed.")
         self.confirm_cancel.lift()
 

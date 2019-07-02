@@ -6,7 +6,8 @@ import lib
 import os
 import socket
 
-
+#TODO redo batch updates so that u can update multiple sheets in a spreadsheet
+#   don't need to do batch updates for multiple spreadsheets though
 class SheetsAPI(DriveAPI):
 
     def __init__(self, token:str, credentials:str, readonly=True, readwrite=False, file=False):
@@ -27,11 +28,11 @@ class SheetsAPI(DriveAPI):
             self._spreadsheet = self.sheets_service.spreadsheets()
         return self._spreadsheet
 
-    async def get_sheet(self, spreadsheetid, range, num_entries=0):
-        result = self.spreadsheet.value().get(spreadsheetId=spreadsheetid, range=range)
+    async def get_sheet(self, spreadsheetid, range, num_entries=0) -> dict:
+        result = self.spreadsheet.values().get(spreadsheetId=spreadsheetid, range=range)
         return await self._async_execute(result)
 
-    async def new_sheet(self, title="Untitled Spreadsheet", retries=0):
+    async def new_spreadsheet(self, title="Untitled Spreadsheet", retries=0):
         body = {
             "properties":{
                 "title":title
@@ -47,7 +48,7 @@ class SheetsAPI(DriveAPI):
         sheets = [properties(dct)["title"] for dct in sheets]
         if title in sheets:
             raise ValueError(f"Sheet '{title}' already exists.")
-    
+
         body = {"requests": [
                 {
                 "addSheet": {

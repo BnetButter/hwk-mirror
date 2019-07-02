@@ -13,7 +13,7 @@ import sys
 import decimal
 import os
 import io
-
+from .metaclass import Ticket
 from .data import address, device_ip, port, router_ip
 from .data import APPDATA
 from .data import ASCIITIME, LEVEL_NAME, MESSAGE
@@ -57,6 +57,7 @@ class GlobalState:
         self.requests = result["requests"]
         self.connected_clients = result["connected_clients"]
         self.shutdown_now = result["shutdown_now"]
+        return result
 
     def dumps(self):
         dct = {
@@ -95,7 +96,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         self.order_queue = OrderedDict()
         self.ticket_no = 1
         self.shutdown_now = False
-        self.coroutine = self.coroutine_switch()
+        self.responses = self.request_response()
         self.logger = logger
 
     async def on_connect(self, ws, client_id) -> tuple:
@@ -153,7 +154,7 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
                 await self.on_disconnect(ws, client_id)
                 self.connected_clients = [client_id for client_id in self.clients]
             else:
-                await self.coroutine(ws, client_id, request, data)
+                await self.respond(ws, client_id, request, data)
     
     async def update_handler(self, ws, *args, **kwargs):
         async for message in ws:
@@ -166,116 +167,28 @@ class ServerInterface(GlobalState, metaclass=ABCMeta):
         self.loop.run_until_complete(websockets.serve(self.server_handler, device_ip, port))
         self.loop.run_forever()
 
-    def coroutine_switch(self):
+    async def respond(self, ws, client_id, request, data):
+        task = self.responses.get(client_id)
+        if task is None:
+            logger.error(f"Unknown client: {client_id}")
+            raise ValueError
+    
+        task = task.get(request)
+        if task is None:
+            logger.error(f"Unknown request: {request}")
+            raise ValueError
 
-        pos = {
-            "new_order":self.new_order,
-            "global_shutdown":self.global_shutdown,
-            "get_time": self.get_time,
-            "edit_menu": self.edit_menu,
-            "modify_order": self.modify_order,
-            "cancel_order":self.cancel_order,
-            "get_menu": self.get_menu,
-        }
-        display = {
-            "order_complete":self.order_complete,
-            "set_ticket_status": self.set_ticket_status,
-            "set_order_status": self.set_order_status,
-            "set_item_status": self.set_item_status,
-            "set_ticket_printed": self.set_ticket_printed,
-            "get_time": self.get_time,
-        }
-
-        extern = {
-            "extract": self.extract,
-            "ping": self.ping
-        }
-        
-        switch = {
-            "POS":pos,
-            "Display":display,
-            "Extern": extern
-        }
-
-        async def task(ws, client_id, request, data):
-            task = switch.get(client_id)
-            if task is None:
-                logger.error(f"Unknown client: {client_id}")
-                raise ValueError
-        
-            task = task.get(request)
-            if task is None:
-                logger.error(f"Unknown request: {request}")
-                raise ValueError
-
-            logger.info(f"Received '{request}' from {client_id}") 
-            
-            try:
-                return await task(ws, data)
-            except:
-                logger.critical(f"Failed to process '{request}' from {client_id}")
-
+        logger.info(f"Received '{request}' from {client_id}") 
+        try:
+            return await task(ws, data)
+        except:
+            logger.critical(f"Failed to process '{request}' from {client_id}")
         return task
     
     @abstractmethod
-    async def ping(self):
-        ...
+    def request_response(self) -> dict:
+        return {}
 
-    @abstractmethod
-    async def new_order(self):
-        ...
-    
-    @abstractmethod
-    async def set_item_status(self):
-        ...
-    
-    @abstractmethod
-    async def set_order_status(self):
-        ...
-    
-    @abstractmethod
-    async def set_ticket_status(self):
-        ...
-    
-    @abstractmethod
-    async def global_shutdown(self):
-        ...
-    
-    @abstractmethod
-    async def get_time(self):
-        ...
-    
-    @abstractmethod
-    async def order_complete(self):
-        ...
-    
-    @abstractmethod
-    async def modify_order(self):
-        ...
-    
-    @abstractmethod
-    async def cancel_order(self):
-        ...
-    
-    @abstractmethod
-    async def edit_menu(self):
-        ...
-
-    @abstractmethod
-    async def get_menu(self):
-        ...
-
-    @abstractmethod
-    async def remove_completed(self):
-        ...
-    
-    @abstractmethod
-    async def extract(self):
-        ...
-
-    @abstractmethod
-    async def set_ticket_printed(self):
-        ...
 
 class ClientInterface(GlobalState):
 

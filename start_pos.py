@@ -27,7 +27,6 @@ if __name__ == "__main__":
     import Server
     import pos
     import server
-
     pos = multiprocessing.Process(target=pos.main, args=(POS.POSProtocol,))
     server = multiprocessing.Process(target=server.main)
     server.start()

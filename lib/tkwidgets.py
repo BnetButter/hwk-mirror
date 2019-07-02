@@ -67,7 +67,7 @@ class LabelButton(tk.Label):
             self.command()
 
 
-class MessageButton(tk.Message):
+class MessageButton(tk.Message): 
     null_cmd = lambda: None
 
     def __init__(self, parent, **kwargs):
@@ -132,6 +132,35 @@ class ToggleSwitch(LabelButton):
     
     def reset(self):
         self.state = False
+
+
+class LabeledEntry(tk.Frame):
+
+    def __init__(self, master, text=None, textvariable=None, font=None, state=None, **kwargs):
+        super().__init__(master, **kwargs)
+        if textvariable is None:
+            textvariable = tk.StringVar(self)    
+        if text is None:
+            text = ""
+        self._sv = textvariable
+        self.entry = tk.Entry(self, textvariable=self._sv, font=font, state=state)
+        self.label = tk.Label(self, text=text, font=font)
+        self.entry.grid(row=0, column=1, sticky="nswe")
+        self.label.grid(row=0, column=0, sticky="nswe")
+
+    def configure_label(self, **kwargs):
+        self.label.configure(**kwargs)
+    
+    def configure_entry(self, **kwargs):
+        self.entry.configure(**kwargs)
+    
+    def get(self):
+        return self._sv.get()
+    
+    def set(self, value):
+        self._sv.set(str(value))
+
+
 
 class EntryVariable(tk.Entry):
 
@@ -273,13 +302,13 @@ class TabbedFrame(tk.Frame):
 
 class PriceInput(tk.Entry):
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, conditional_bind=True, **kwargs):
         super().__init__(parent, **kwargs)
         self._value = kwargs.get("textvariable")
         if self._value is None:
             self._value = tk.StringVar(parent)
             self._value.set("0.00")
-        
+        self.conditional_bind = conditional_bind
         self.configure(
                 textvariable=self._value,
                 state=tk.DISABLED,
@@ -290,7 +319,7 @@ class PriceInput(tk.Entry):
             condition=lambda *args:False,
             on_enter=lambda:None):
         
-        def on_event(event):            
+        def on_event(event):
             if not condition():
                 return
             
@@ -308,8 +337,8 @@ class PriceInput(tk.Entry):
                 self.value = 0
                 return
             self.value += char
-        
-        return target.bind("<Key>", on_event, "+")
+        if self.conditional_bind:
+            return target.bind("<Key>", on_event, "+")
 
     @property
     def value(self):

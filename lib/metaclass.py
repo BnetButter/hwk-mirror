@@ -15,51 +15,17 @@ import websockets
 import logging
 
 class MenuItemType(ABCMeta):
-
     __attributes = ("category", "name", "price", "options", "alias", "hidden")
-    def __new__(cls, name, bases, attr, **kwargs):
-        if "__str__" not in attr:
-            attr["__str__"] = cls.__str__
-        attr["__bases__"] = bases
-        return super().__new__(cls, name, bases, attr, **kwargs)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        getproperty = lambda index: property(self.getx(index), self.setx(index))
+        getproperty = lambda index: property(itemgetter(index), self.setx(index))
         self.category = getproperty(0)
         self.name = getproperty(1)
         self.price = getproperty(2)
         self.options = getproperty(3)
         self.alias = getproperty(4)
         self.hidden = getproperty(5)
-
-    @staticmethod
-    def __str__(self):
-
-        if tuple in type(self).__bases__:
-            cls = tuple
-        if list in type(self).__bases__ \
-                or UserList in type(self).__bases__:
-            cls = list
-
-
-        string = "{}={}".format
-        result = str(cls(
-            string(name, attr)
-            for name, attr in zip(type(self).__attributes, self)))
-        return "MenuItem" + result.replace("'", "")
-
-    @staticmethod
-    def dct_setx(index, key):
-        def _(self, value):
-            self[index][key] = value
-        return _
-    
-    @staticmethod
-    def dct_getx(index, key):
-        def _(self):
-            return self[index][key]
-        return _
 
     @staticmethod
     def setx(index):
@@ -74,9 +40,22 @@ class MenuItemType(ABCMeta):
         return _
         
 
-class MenuItem(tuple):
-    def __new__(cls, category, name, price, options):
-        return super().__new__(cls, (category, name, price, options))
+class SingletonType(ABCMeta):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance = None
+
+    def __call__(self, *args, **kwargs):
+        if self.instance is None:
+            self.instance = super().__call__(*args, **kwargs)
+        return self.instance
+
+
+class MenuItem(tuple, metaclass=MenuItemType):
+
+    def __new__(cls, category, name, price, options, alias, hidden):
+        return super().__new__(cls, (category, name, price, options, alias, hidden))
     
     def __eq__(self, other):
         return self[0] == other[0] \
@@ -84,11 +63,7 @@ class MenuItem(tuple):
     
     def __bool__(self):
         return self.name != ""
-    
-    category = property(itemgetter(0))
-    name = property(itemgetter(1))
-    price = property(itemgetter(2))
-    options = property(itemgetter(3))
+
 
 
 class MenuType(ABCMeta):
@@ -116,7 +91,9 @@ class MenuType(ABCMeta):
         return [
             cls(category, item,
                     self.menu[category][item]["Price"],
-                    self.menu[category][item]["Options"])
+                    self.menu[category][item]["Options"],
+                    self.menu[category][item]["alias"],
+                    self.menu[category][item]["hidden"])
                 for item in self.menu[category]
             ]
 
@@ -124,7 +101,9 @@ class MenuType(ABCMeta):
     def get_item(category, name):
         price = MenuType.menu_items[category][name]["Price"]
         options = MenuType.menu_items[category][name]["Options"]
-        return MenuItem(category, name, price, options)
+        alias = MenuType.menu_items[category][name]["alias"]
+        hidden = MenuType.menu_items[category][name]["hidden"]
+        return MenuItem(category, name, price, options, alias, hidden)
 
     @staticmethod
     def null_item(self, cls=MenuItem):
@@ -185,41 +164,58 @@ class MenuType(ABCMeta):
     @property
     def taxrate(self):
         return Decimal(self.config["Tax"]).quantize(Decimal('.01'))
+
+
+class TicketType(MenuItemType, MenuType):
+
+    def __init__(self, name, bases, attr, **kwargs):
+        super().__init__(name, bases, attr, **kwargs)
+        self.selected_options = property(itemgetter(6), self.set_selected_options)
+        self.parameters = property(itemgetter(7), self.setter(7))
+        self.addon1 = property(itemgetter(8), self.setter(8))
+        self.addon2 = property(itemgetter(9), self.setter(9))
+        self.menu_base = property(self._menu_base)
     
-class TicketType(MenuType):
+    @staticmethod
+    def _menu_base(self):
+        return MenuItem(self.category, self.name, self.price, self.options, self.alias, self.hidden)
 
-    def __init__(self, name, bases, attr, *args, **kwargs):
-        self.category = property(itemgetter(0), self.setter(0))
-        self.name = property(itemgetter(1), self.setter(1))
-        self.price = property(itemgetter(2), self.setter(2))
-        self.options = property(itemgetter(3), self.setter(3))
-        self.selected_options = property(itemgetter(4), self.set_selected_options)
-        self.parameters = property(itemgetter(5), self.setter(5))
-        self.addon1 = property(itemgetter(6), self.setter(6))
-        self.addon2 = property(itemgetter(7), self.setter(7))
-        self.alias = property(self.get_parameter("alias"), self.set_parameter("alias"))
+    def split(self, item, cls=list):
+        addon1, addon2 = item.addon1, item.addon2
+        item = self.convert_to(*item[:-2])
+        return cls((item, addon1, addon2))
+    
+    def join(self, item, addon1, addon2):
+        return self.convert_to(*item, addon1=addon1, addon2=addon2)
 
-
-    def convert_to(self, category, name, price, options, selected_options, parameters, addon1=None, addon2=None):
+    def convert_to(self, category, name, price, options, alias, hidden, selected_options, parameters, addon1=None, addon2=None):
         if addon1 is not None and addon2 is not None:
             addon1 = tuple.__new__(self, addon1)
             addon2 = tuple.__new__(self, addon2)
-            return tuple.__new__(self, (category,name,price,options,selected_options,parameters, addon1,addon2))
-        return tuple.__new__(self, (category,name,price,options,selected_options,parameters))
+            return tuple.__new__(self, (category,name,price,options,
+                alias,hidden,selected_options,parameters, addon1,addon2))
+        return tuple.__new__(self, (category,name,price,options,
+                alias,hidden,selected_options,parameters))
+
+    def to_list(self, ticket):
+        addon1 = list(ticket.addon1)
+        addon2 = list(ticket.addon2)
+        ticket = list(ticket)
+        ticket[-2] = addon1
+        ticket[-1] = addon2
+        return ticket
 
     @staticmethod
     def compare(self, other) -> (list, int):
         """compare(a, b) -> (list, int)
             returned list is a list of strings
             returned int is a count of differences"""
-            
         differences = []
-        if (len(self) != 8 or len(other) != 8) and len(self) == len(other):
-            raise ValueError("no addons for comparison")
+        if (len(self) != 10 or len(other) != 10):
+            raise ValueError(f"Invalid comparison {len(self)}, {len(other)}")
 
-        a = self, self[6], self[7]
-        b = other, other[6], other[7]
-
+        a = self, self.addon1, self.addon2
+        b = other, other.addon1, other.addon2
         no_changes = "{}".format
         changed_to = "{} -> {}".format
         removed = "{} (removed)".format
@@ -329,7 +325,7 @@ class Ticket(MenuItem, metaclass=TicketType):
         else:
             assert all(option in menu_item[3] for option in selected_options)
             return tuple.__new__(cls, (*menu_item, list(selected_options), parameters))
-    
+
     def __bool__(self):
         return self.total > 0
 
@@ -350,7 +346,7 @@ class Ticket(MenuItem, metaclass=TicketType):
         self.selected_options.clear()
         self.selected_options.extend(value)
 
-    parameters = property(itemgetter(5))
+
 
 
 class WidgetType(ABCMeta):
@@ -378,37 +374,20 @@ class WidgetType(ABCMeta):
         return super().__new__(cls, name, bases, attr)
 
 
-# OrderInterface creates a singleton class accessed by calling lib.Order()
-# calling lib.NewOrder() replaces the instance with a new list
-class OrderInterface(TicketType, MenuType, UserList):
-    instance = None
+class OrdersType(MenuType, SingletonType):
 
-    def __new__(cls, name, bases, attr, *args, **kwargs):
-        attr["data"] = list()
-        cls.instance = super().__new__(cls, name, bases, attr)
-        return cls.instance
-    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.data = list()
-
-    def __str__(self):
-        lines = list()
-        for ticket in self.data:
-            lines.append(str(ticket))
-        return "\n".join(lines)
-
-    def remove(self, item):
-        for i, order in enumerate(self.data):
-            if item is order:
-                return self.pop(i)
-
-    @property
-    def total(self)->int:
+        self.total = property(self._total)
+        self.subtotal = property(self._subtotal)
+        self.tax = property(self._tax)
+    
+    @staticmethod
+    def _total(self)->int:
         return sum(ticket.total for ticket in self.data)
     
-    @property
-    def subtotal(self)->int:
+    @staticmethod
+    def _subtotal(self)->int:
         tax_scale = int((self.taxrate * 100) + 10000)
         result = Decimal((self.total * 100) 
                 / tax_scale).quantize(
@@ -416,9 +395,16 @@ class OrderInterface(TicketType, MenuType, UserList):
                         rounding=ROUND_HALF_DOWN)
         return int(result * 100)
 
-    @property
-    def tax(self)->int:
+    @staticmethod
+    def _tax(self)->int:
         return self.total - self.subtotal
+
+    @staticmethod
+    def _taxrate(self):
+        return type(self).taxrate
+
+
+
     
 # resolve metaclas conflict
 class MenuWidget(WidgetType, MenuType): ...
@@ -446,6 +432,7 @@ class ToplevelWidget(MenuWidget):
         if result is not None:
             result.attributes("-topmost", True)
             return self.center(result)
+
 
 class ReinstanceType(MenuWidget):
     objects = list()
@@ -496,16 +483,7 @@ class ReinstanceType(MenuWidget):
     
         
                 
-class SingletonType(type):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.instance = None
-
-    def __call__(self, *args, **kwargs):
-        if self.instance is None:
-            self.instance = super().__call__(*args, **kwargs)
-        return self.instance
 
 
 class SingletonMenu(MenuType, SingletonType):
