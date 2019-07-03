@@ -129,7 +129,7 @@ class DisplayProtocol(lib.DisplayInterface):
     def tickets(self):
         if self.order_queue is None:
             return []
-        return [ticket for ticket in self.flat_order_queue]
+        return [ticket for ticket in self.flat_order_queue if not ticket.is_complete()]
         
     def loads(self, string):
         result = super().loads(string)
