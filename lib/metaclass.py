@@ -319,15 +319,11 @@ class TicketType(MenuItemType, MenuType):
 
 class Ticket(MenuItem, metaclass=TicketType):
 
-    def __new__(cls, menu_item, selected_options=None, parameters={}):
-        if selected_options is None:
-            return tuple.__new__(cls, (*menu_item, list(), parameters))
-        else:
-            assert all(option in menu_item[3] for option in selected_options)
-            return tuple.__new__(cls, (*menu_item, list(selected_options), parameters))
+    def __new__(cls, menu_item, selected_options=[], parameters={}):
+        return tuple.__new__(cls, (*menu_item, selected_options, parameters))
 
     def __bool__(self):
-        return self.total > 0
+        return bool(self.name)
 
     @property
     def total(self):

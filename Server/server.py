@@ -12,7 +12,7 @@ import collections
 import multiprocessing
 
 class Server(ServerInterface):
-        
+
     def __init__(self):
         super().__init__()
         self.api_queue = multiprocessing.Queue()
@@ -40,6 +40,7 @@ class Server(ServerInterface):
             "set_order_status": self.set_order_status,
             "set_item_status": self.set_item_status,
             "set_ticket_printed": self.set_ticket_printed,
+            "set_item_printed": self.set_item_printed,
             "get_time": self.get_time,
         }
 
@@ -50,8 +51,9 @@ class Server(ServerInterface):
         
         return {
             "POS":pos,
-            "Display":display,
-            "Extern": extern
+            "Display0":display,
+            "Extern": extern,
+            "Display1":display,
         }
 
     async def ping(self, ws, data):
@@ -60,8 +62,10 @@ class Server(ServerInterface):
     async def new_order(self, ws, data):
         data["items"] = [lib.Ticket.convert_to(*ticket) for ticket in data["items"]]
         self.order_queue[self.ticket_no] = data
+        self.order_queue[self.ticket_no]["print"] = lib.PRINT_NEW
         await ws.send(json.dumps({"result":self.ticket_no}))
         self.ticket_no += 1
+        
     
     async def set_ticket_printed(self, ws, data):
         ticket = self.order_queue[int(data)]
@@ -86,8 +90,6 @@ class Server(ServerInterface):
     async def remove_completed(self):
         while True:
             number = await self.completed_tickets.get()
-            while self.order_queue[number]["print"]:
-                await asyncio.sleep(1/60)
             self.logger.info("completed ticket no. {:03d}".format(number))
             result = self.order_queue.pop(number)
             self.completed_tickets.task_done()
@@ -96,8 +98,6 @@ class Server(ServerInterface):
     async def remove_cancelled(self):
         while True:
             number = await self.canceled_tickets.get()
-            while self.order_queue[number]["print"]:
-                await asyncio.sleep(1/60)
             self.order_queue.pop(number)
             self.canceled_tickets.task_done()
 
@@ -134,17 +134,35 @@ class Server(ServerInterface):
             await ws.send(json.dumps({"result":(True, None)}))
 
     async def set_item_status(self, ws, data):
-        ticket_no, nth_ticket, item_idx, value = data
-        if ticket_no not in self.order_queue:
-            return await ws.send(json.dumps({"result":(False, f"ticket no. {ticket_no} does not exist")}))
-        
-        ticket = self.order_queue[ticket_no]["items"][nth_ticket]
-        item = {0:ticket, 1:ticket.addon1, 2:ticket.addon2}.get(item_idx)
-        if not item.name:
-            return await ws.send(json.dumps({"result": (False, f"Cannot set status of empty ticket")}))
-        item.parameters["status"] = value
-        return await ws.send(json.dumps({"result":(True, None)}))
-        
+        d3, value = data
+        if d3:
+            for ticket_no, index, subindex in d3:
+                ticket = self.order_queue[ticket_no]["items"][index]
+                item = {0:ticket,1:ticket.addon1,2:ticket.addon2}.get(subindex)
+                if item.name:
+                    item.parameters["status"] = value
+            ticket = self.order_queue[d3[0][0]]["items"]
+            return await ws.send(json.dumps({"result":self.order_complete(ticket)}))
+        else:
+            return await ws.send(json.dumps({"result":False}))
+    
+    async def set_item_printed(self, ws, data):
+        d3, value = data
+        if d3:
+            for ticket_no, index, subindex in d3:
+                ticket = self.order_queue[ticket_no]["items"][index]
+                item = {0:ticket, 1:ticket.addon1, 2:ticket.addon2}.get(subindex)
+                if item.name:
+                    item.parameters["print"] = value
+            return await ws.send(json.dumps({"result":True}))
+        else:
+            return await ws.send(json.dumps({"result":None}))
+
+    @staticmethod
+    def ticket_complete(ticket):
+        return all(item.parameters.get("status") == lib.TICKET_COMPLETE 
+                for item in (ticket, ticket.addon1, ticket.addon2) if item.name)
+
     @staticmethod
     def order_complete(items):
         valid_items = (item 

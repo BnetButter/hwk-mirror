@@ -1,39 +1,48 @@
-#! /home/pi/.local/bin/python3.7
-
+# shows orders on drinks line
+import LineDisplay
 import lib
-import Display
 import tkinter as tk
-import logging
 import sys
 import subprocess
+import functools
 
-def main(delegate):
-    logger = logging.getLogger("main")
-    main = lib.AsyncTk(delegate())
+def main(protocol, ncol, geometry=None):
+    app = lib.AsyncTk(protocol())
     if lib.DEBUG:
-        geometry = "1080x1080"
         fullscreen = False
+        assert geometry is not None
     else:
-        geometry = "1080x1920"
         fullscreen = True
-        # set baudrate for receipt printer
-        subprocess.call("stty -F /dev/serial0 19200", shell=True)  
-    main.attributes("-fullscreen", fullscreen)
-    main.geometry(geometry)
-    main.resizable(False, False)
+        geometry = f"{app.winfo_screenwidth()}x{app.winfo_screenheight()}"
+        # set baudrate for printer
+        subprocess.call("stty -F /dev/serial0 19200", shell=True)
     
-    title_bar = Display.TitleBar(main)
-    ticket_queue = Display.TicketQueue(main)
+    app.attributes("-fullscreen", fullscreen)
+    app.geometry(geometry)
+    app.resizable(False, False)    
+    app.grid_columnconfigure(0, weight=1)
+    app.grid_rowconfigure(0, weight=1)
 
-    main.bind_all("<KP_Enter>", ticket_queue.advance)
-    main.bind_all("<Return>", ticket_queue.advance)
+    queue = LineDisplay.TicketQueue(
+            app,
+            functools.partial(
+                LineDisplay.TicketInfo,
+                ncol=ncol),
+            5,
+            orient=tk.VERTICAL,
+            reverse=True)
+    titlebar = LineDisplay.TitleBar(app, bg="grey16")
+    queue.grid(row=0, column=0, sticky="nswe")
+    queue.grid_inner(columnspan=2, sticky="nswe")
+    titlebar.grid(row=1, column=0, sticky="we")
+    queue.update()
+    titlebar.update()
+    app.bind("<KP_Enter>", queue.on_enter)
+    app.bind("<KP_0>", titlebar.toggle_print)
+    app.bind("<KP_Insert>", titlebar.toggle_print)
 
-    title_bar.pack(fill=tk.X, side=tk.BOTTOM)
-    ticket_queue.pack(fill=tk.BOTH, side=tk.BOTTOM)
+    app.bind("<KP_Begin>", queue.recenter)
+    app.bind("<KP_5>", queue.recenter)
+
+    app.mainloop()
     
-    # add update task to mainloop
-    title_bar.update()
-    ticket_queue.update()
-    # add update task to async tasks
-    delegate.shutdown(main.delegate, cleanup=lib.AsyncTk().destroy)
-    main.mainloop()

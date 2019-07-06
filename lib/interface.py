@@ -88,7 +88,7 @@ class GlobalState:
 
 class ServerInterface(GlobalState, metaclass=ABCMeta):
     loop = asyncio.get_event_loop()
-    available_ports = {"7000", "8000", "9000"}
+    available_ports = {"8081", "8082", "8083", "8084", "8085"}
     clients = dict()
 
     def __init__(self):
@@ -204,7 +204,6 @@ class ClientInterface(GlobalState):
         self.log = logging.getLogger(f"main.{self.client_id}.interface")
         self.log.setLevel(logging.WARNING)
 
-    
     async def server_message(self, request, data):
         async with websockets.connect(address) as ws:
             await ws.send(json.dumps({"client_id":self.client_id, "request":request, "data":data}))
@@ -328,7 +327,8 @@ class DisplayInterface(ClientInterface):
 
     def __init__(self):
         super().__init__("Display")
-    
+
+
     @abstractmethod
     def set_ticket_status(self):
         ...

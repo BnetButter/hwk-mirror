@@ -12,7 +12,7 @@ from .checkout_display import *
 from .network_status import NetworkStatus
 from .titlebar import *
 from .progress_tab import *
-from .order import Order, NewOrder
+from .order import *
 from .control_panel import *
 
 

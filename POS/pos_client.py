@@ -71,22 +71,6 @@ class POSProtocol(POSInterface):
         order_dct["change_due"] = change_due
         order_dct["name"] = name
         order_dct["deliver"] = deliver
-        
-        # set print flag
-        cnt_all = 0 # number of non-NULL items
-        cnt_reg = 0 # number of items with register flag
-        for ticket in Order():
-            items = filter(lambda item: item.name, (ticket, ticket.addon1, ticket.addon2))
-            for item in items:
-                cnt_all += 1
-                if item.parameters.get("register", False):
-                    cnt_reg += 1
-                    item.parameters["status"] = lib.TICKET_COMPLETE
-        
-        if cnt_all == cnt_reg:
-            order_dct["print"] = False
-        else:
-            order_dct["print"] = lib.PRINT_NEW
         return order_dct
 
     def _new_receipt_content(self, payment_type, cash_given, change_due):
@@ -271,8 +255,8 @@ class POSProtocol(POSInterface):
         modified_dct = self.create_order(modified,
                 total,
                 original_dct["payment_type"])
-        
-        modified_dct["print"] = lib.PRINT_MOD
+        modified_dct["name"] = original_dct["name"]
+        modified_dct["deliver"] = original_dct["deliver"]
         # print message to console
         message = "Modified ticket no. {} - Price difference: {}"
         difference = "{:.2f}".format((total - original_dct["total"]) / 100)
@@ -371,12 +355,7 @@ class POSProtocol(POSInterface):
                     total += self._item_total(addon)
         return total
 
-    @staticmethod
-    def set_ticket_status(ticket):
-        if ticket.parameters["register"]:
-            ticket.parameters["status"] = TICKET_COMPLETE
-        else:
-            ticket.parameters["status"] = TICKET_QUEUED
+
     
     @staticmethod
     def create_order(ordered_items, total, payment_type):
@@ -394,7 +373,7 @@ class POSProtocol(POSInterface):
 
         tax = total - subtotal
         order_dct["subtotal"] = subtotal
-        order_dct["tax"] = tax    
+        order_dct["tax"] = tax
         return order_dct
     
     def print_invoice(self):

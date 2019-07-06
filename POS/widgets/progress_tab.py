@@ -156,6 +156,7 @@ class ItemEditor(metaclass=ItemEditorType, device="POS"):
             self.ticket.name = item_name
             self.ticket.price, self.ticket.options = \
                      type(self).item_lookup(self._ticket.category, item_name)
+            self.ticket.parameters["status"] = None
         else:
             self.ticket.price = 0
             self.ticket.selected_options.clear()
