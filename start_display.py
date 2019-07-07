@@ -4,8 +4,6 @@ import pathlib
 import os
 import json
 
-
-
 if __name__ == "__main__":
     confpath = os.path.join(str(pathlib.Path.home()),".hwk/config.json")
     with open(confpath, "r") as fp:
@@ -19,8 +17,10 @@ if __name__ == "__main__":
     import LineDisplay
     import display
     import sys
+    import functools
 
     if sys.argv[1] == "display0":
         display.main(LineDisplay.CookLineProtocol, 3)
     elif sys.argv[1] == "display1":
+        client = functools.partial(LineDisplay.DrinkLineProtocol, exclude=["Bottled", "Pie", "Cake"])
         display.main(LineDisplay.DrinkLineProtocol, 2)
