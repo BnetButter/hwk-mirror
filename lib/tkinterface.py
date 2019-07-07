@@ -13,7 +13,6 @@ import logging
 import collections
 import os
 import multiprocessing
-import time
 
 
 class AsyncInterface:
@@ -57,6 +56,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
         self.logger = logging.getLogger(f"main.{delegate.client_id}")
         if isinstance(title, str):
             self.wm_title(title)
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
         if refreshrate is None:
             refreshrate = 60
         self.interval = 1 / refreshrate
@@ -107,7 +107,6 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     def destroy(self, shutdown=True):
         self.running = False
         super().destroy()
-        time.sleep(2)
         if not DEBUG and shutdown:
             os.system("sudo shutdown -H now")
 
