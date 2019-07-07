@@ -249,6 +249,8 @@ class TicketType(MenuItemType, MenuType):
                 change_count += 1
 
             elif (a.name and b.name) and a.name == b.name:
+                if a.parameters.get("comments") != b.parameters.get("comments"):
+                    change_count += 1
 
                 if a.selected_options == b.selected_options:
                     if i:
@@ -319,8 +321,17 @@ class TicketType(MenuItemType, MenuType):
 
 class Ticket(MenuItem, metaclass=TicketType):
 
-    def __new__(cls, menu_item, selected_options=[], parameters={}):
-        return tuple.__new__(cls, (*menu_item, selected_options, parameters))
+    def __new__(cls, menu_item, selected_options=None, parameters=None):
+        # need new objects instead of references.
+        if selected_options is None:
+            selected_options = list()
+        else:
+            selected_options = list(selected_options)
+        if parameters is None:
+            parameters = dict()
+        else:
+            parameters = dict(parameters)
+        return tuple.__new__(cls, (*menu_item, list(selected_options), dict(parameters)))
 
     def __bool__(self):
         return bool(self.name)
