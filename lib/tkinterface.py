@@ -91,7 +91,9 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
                 for task in self.tasks:
                     task.cancel()
                 self.loop.stop()
-        
+                if not DEBUG:
+                    os.system("sudo shutdown -H now")
+                
         logger = logging.getLogger(f"main.{self.delegate.client_id}.gui")
         stdout_stream = logging.StreamHandler(stream=stdout)
         stdout_stream.addFilter(logging.Filter(f"{logger.name}.stdout"))
@@ -107,8 +109,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     def destroy(self, shutdown=True):
         self.running = False
         super().destroy()
-        if not DEBUG and shutdown:
-            os.system("sudo shutdown -H now")
+        
 
     def __call__(self):
         self.mainloop()

@@ -18,6 +18,7 @@ from .data import address, device_ip, port, router_ip
 from .data import APPDATA
 from .data import ASCIITIME, LEVEL_NAME, MESSAGE
 from .data import GUI_STDOUT, GUI_STDERR
+from .data import DEBUG
 from .tkinterface import AsyncTk
 from datetime import datetime
 
@@ -287,8 +288,7 @@ class ClientInterface(GlobalState):
                 if self.shutdown_now:
                     await asyncio.sleep(self.shutdown_now)
                     cleanup()
-                    if shutdown_system:
-                        subprocess.call("shutdown -h now")
+                    
                 else:
                     await asyncio.sleep(1/30)
         self.loop.create_task(shutdown())
