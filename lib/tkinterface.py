@@ -13,7 +13,7 @@ import logging
 import collections
 import os
 import multiprocessing
-
+import time
 
 
 class AsyncInterface:
@@ -51,7 +51,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     update_tasks = list()
     instance = None
     
-    def __init__(self, delegate=None, title=None, refreshrate=None, additional_cores=0):
+    def __init__(self, delegate=None, title=None, refreshrate=None):
         super().__init__(delegate)
         tk.Tk.__init__(self)
         self.logger = logging.getLogger(f"main.{delegate.client_id}")
@@ -107,6 +107,7 @@ class AsyncTk(AsyncInterface, tk.Tk, metaclass=SingletonType):
     def destroy(self, shutdown=True):
         self.running = False
         super().destroy()
+        time.sleep(2)
         if not DEBUG and shutdown:
             os.system("sudo shutdown -H now")
 

@@ -85,7 +85,7 @@ class LineDisplayProtocolBase(lib.ClientInterface, metaclass=abc.ABCMeta):
     def __init__(self, client_id, _class=TicketData, _print=True):
         super().__init__(client_id)
         self.connect()
-        self.test_network_connection()
+        self.test_network_connection()  
         self.data = list()
         assert issubclass(_class, TicketData)
         self.ticket_type = _class
