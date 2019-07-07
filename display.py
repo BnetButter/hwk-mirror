@@ -43,6 +43,8 @@ def main(protocol, ncol, geometry=None):
 
     app.bind("<KP_Begin>", queue.recenter)
     app.bind("<KP_5>", queue.recenter)
-
+    app.delegate.shutdown(
+            cleanup=app.destroy,
+            shutdown_system=False if lib.DEBUG else True)
     app.mainloop()
     

@@ -43,7 +43,7 @@ def main():
     display0_process = multiprocessing.Process(target=target0)
     
     target1_protocol = functools.partial(LineDisplay.DrinkLineProtocol, exclude=["Bottled"])
-    target1 = functools.partial(display.main, target1_protocol, ncol=2, geometry="1600x900")
+    target1 = functools.partial(display.main, target1_protocol, ncol=2, geometry="1440x900")
     display1_process = multiprocessing.Process(target=target1)
 
     try:

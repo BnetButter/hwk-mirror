@@ -15,8 +15,12 @@ if __name__ == "__main__":
     config["ip"] = Connection(router_ip, port).result
     with open(confpath, "w") as fp:
        json.dump(config, fp, indent=4)
-    
-    from Display import DisplayProtocol
-    from display import main
 
-    main(DisplayProtocol)
+    import LineDisplay
+    import display
+    import sys
+
+    if sys.argv[1] == "display0":
+        display.main(LineDisplay.CookLineProtocol, 3)
+    elif sys.argv[1] == "display1":
+        display.main(LineDisplay.DrinkLineProtocol, 2)
