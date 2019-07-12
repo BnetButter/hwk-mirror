@@ -1,11 +1,14 @@
 import lib
-import printer
 
+if not lib.DEBUG:
+    import printer
+    def Printer(*args):
+        result = printer.new()
+        result.__init__("/dev/serial0")
+        return result
 
-port = "/dev/null" if lib.DEBUG else "/dev/serial0"
+else:
+    class Printer:
 
-def Printer(*args):
-    result = printer.new()
-    result.__init__(port)
-    return result
-
+        def writeline(self, *args, **kwargs):
+            ...

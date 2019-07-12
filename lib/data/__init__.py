@@ -28,17 +28,11 @@ DEBUG = CONFIGDATA["__debug"]
 router_ip = CONFIGDATA["router"]
 device_ip = CONFIGDATA["ip"]
 port = CONFIGDATA["port"] # port of the primary server handler
-address = f"ws://{device_ip}:{port}"
+address = f"ws://localhost:{port}"
 
+SALESLOG_SPREADSHEET_ID = None
 
-
-SALESLOG_SPREADSHEET_ID = \
-    "1qvbFERuS--3eEvJItBqTekLqUifGFaMhKFjbsajVA4g" if DEBUG \
-        else CONFIGDATA["saleslog id"]
-
-MENU_SPREADSHEET_ID = \
-    "1MRrQhfoG_DODGQYruOYrUluqnBecAP2E-_AYVzZXdYI" if DEBUG \
-        else CONFIGDATA["menu id"]
+MENU_SPREADSHEET_ID = None
 
 def test_connection():
     try:

@@ -2,17 +2,32 @@ import lib
 import time
 import socket
 import asyncio
-import GoogleDrive
 import os
 import json
 
+if not lib.DEBUG:
+    import GoogleDrive
+    SheetsAPI = GoogleDrive.SheetsAPI
+else:
+    class SheetsAPI:
+
+        def __init__(self, *args, **kwargs):
+            ...
+        
+        def add_sheet(self, *args):
+            ...
+        
+        def append(self, *args):
+            ...
+    
+        
 
 class SalesLogger(lib.SalesInfo):
 
     def __init__(self):
         date = time.strftime("%m-%d-%y", time.localtime())
         super().__init__(lib.SALESLOG + ".csv")
-        self.api = GoogleDrive.SheetsAPI(lib.TOKEN, lib.CREDENTIALS)
+        self.api = SheetsAPI(lib.TOKEN, lib.CREDENTIALS)
         self.sheet_title = date
         self.new_sales_sheet()
         self.queue = asyncio.Queue()

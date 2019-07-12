@@ -1,7 +1,7 @@
 from pathlib import Path
 import os
 
-APPDATA = os.path.join(str(Path.home()), ".hwk")
+APPDATA = os.path.join(".", ".hwk")
 
 if not os.path.exists(APPDATA):
     os.mkdir(APPDATA)

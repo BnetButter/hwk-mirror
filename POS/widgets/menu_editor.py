@@ -188,7 +188,7 @@ class MenuItemEditor(PriceEntry, metaclass=lib.MenuWidget, device="POS"):
     def __init__(self, parent, menu_item=None):
         super().__init__(parent)        
         if menu_item is None:
-            menu_item = lib.MenuItem("", "", 0, {})
+            menu_item = lib.MenuItem("", "", 0, {}, "", 0)
 
         self.removed = True
         self.category = menu_item.category

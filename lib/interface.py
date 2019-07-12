@@ -35,13 +35,6 @@ class GlobalState:
     """Base class containing global system variables"""
     loop = asyncio.get_event_loop()
     tasks = list()
-
-    __slots__ = ["ticket_no",
-                "order_queue", 
-                "connected_clients",
-                "requests",
-                "shutdown_now",
-                "client_id"]
     
     def __init__(self, client_id=None):
         self.client_id = client_id
