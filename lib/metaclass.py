@@ -54,7 +54,7 @@ class SingletonType(ABCMeta):
 
 class MenuItem(tuple, metaclass=MenuItemType):
 
-    def __new__(cls, category, name, price, options, alias, hidden):
+    def __new__(cls, category, name, price, options, alias="", hidden=False):
         return super().__new__(cls, (category, name, price, options, alias, hidden))
     
     def __eq__(self, other):
@@ -88,12 +88,11 @@ class MenuType(ABCMeta):
         """return a list of menu items"""
         if not category or category not in self.menu.keys():
             return []
+       
         return [
             cls(category, item,
                     self.menu[category][item]["Price"],
-                    self.menu[category][item]["Options"],
-                    self.menu[category][item]["alias"],
-                    self.menu[category][item]["hidden"])
+                    self.menu[category][item]["Options"])
                 for item in self.menu[category]
             ]
 
