@@ -30,7 +30,7 @@ class CookLineProtocol(LineDisplayProtocolBase):
             status = "MODIFIED TICKET", HEADER_OPT
         elif status == lib.PRINT_NUL:
             status = "CANCELED TICKET", HEADER_OPT
-        lines = list()
+        lines = list()  # generally an empty list instantiated with []. list() is usually only used to cast a type to list (e.g. list(some_tuple))
         # ticket.name -> name of customer
         # ticket.item.name -> name of menu item
         if ticket.name:

@@ -5,11 +5,13 @@ from .stream import *
 from .tkinterface import *
 from .interface import *
 
+# As long as I've been programming Python, I don't think I've ever needed to implement new(). In this case you should do this.
 class OrderTicket(Ticket):
     """Base class for a complete Order ticket."""
-    def __new__(cls, item, addon1, addon2):
-        # embedded item
-        return tuple.__new__(cls, (*item, addon1, addon2))
+    def __init__(self, item, addon1, addon2):
+        self.item = item
+        self.addon1 = addon1
+        self.addon2 = addon2
 
 
 NULL_MENU_ITEM = MenuItem("", "", 0, {}, "", 0)

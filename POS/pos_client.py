@@ -60,6 +60,11 @@ class POSProtocol(POSInterface):
             ticket_no = "{:03d}".format(self.ticket_no)
             result.set(ticket_no)
     
+    # I am seeing Order() a lot here.  I get that you are trying to use it as a singleton class, but
+    # that just doesn't seem right.  The syntax Order() tells other python devs that you are creating
+    # an instance of Order type.  Try doing this where Order isn't a singleton.  If you are concerned
+    # about accidentally handling more than one order at a time, just overwrite the old instance with
+    # a new one each time an order is started.
     @staticmethod
     def _new_order(payment_type, cash_given, change_due, name, deliver):
         order_dct = {"items":list(Order())}

@@ -48,6 +48,12 @@ def test_connection():
     except:
         return False
 
+# You probably want to use the Enum library or possibly just an empty class to hold your constants
+# class TicketStatus:
+    # TICKET_QUEUED = 'Queued'
+    # TICKET_WORKER = 'Processing'
+    # TICKET_COMPLETE = 'Complete'
+
 class _TicketStatus(int):
     
     def __new__(cls, number):

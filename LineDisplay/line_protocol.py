@@ -9,6 +9,8 @@ import queue
 import asyncio
 
 
+# look at collections.namedtuple.  It's going to do all this.  In general, think twice before you
+# override a built in type like tuple.
 class Dim3(tuple):
 
     def __new__(cls, ticket_no, index, subindex):
@@ -22,6 +24,7 @@ class Dim3(tuple):
     ticket_no = property(operator.itemgetter(0))
 
 
+# See my comment in general_comments.md about metclasses.  Without spending hours to understand exactly how this object is used, I can't really offer a more salient solution.
 class ItemData(tuple, metaclass=lib.TicketType):
 
     def __new__(cls, item, ticket_no, index, subindex):

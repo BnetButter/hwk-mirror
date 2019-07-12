@@ -7,11 +7,14 @@ import functools
 
 
 
+# I wouldn't name more than one method main.  If it's not the "main" entry point, name it something else.
 def main(protocol):
 
     logger = logging.getLogger("main.POS")
     logger.setLevel(logging.INFO)
     
+    # we are in main() with an object called main.  Remember that main() can recursively call
+    # main(), but this overwrites the name.
     main = AsyncTk(protocol())
     main.geometry("1280x800")
     main.grid_columnconfigure(2, weight=2)

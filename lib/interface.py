@@ -36,6 +36,8 @@ class GlobalState:
     loop = asyncio.get_event_loop()
     tasks = list()
 
+    # Are you really so memory contrained that you need to use slots, or is this a
+    # premature optimization?
     __slots__ = ["ticket_no",
                 "order_queue", 
                 "connected_clients",
@@ -53,6 +55,9 @@ class GlobalState:
 
     def loads(self, string):
         result = json.loads(string)
+        # You are loading 'what you assue' is a serialized dict with these keys.
+        # You should do some validation of the payload before you use its contents.
+        # These dict keys may not exist and will raise an exception.
         self.ticket_no = result["ticket_no"]
         self.order_queue = result["order_queue"]
         self.requests = result["requests"]
